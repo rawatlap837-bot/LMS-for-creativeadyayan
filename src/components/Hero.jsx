@@ -161,7 +161,7 @@ function LogoCarousel({
         {track.map((logo, i) => (
           <div
             key={`${logo.alt}-${i}`}
-            className="flex-none flex items-center justify-center rounded-lg sm:rounded-xl border border-white/10 bg-[#241c38]/60 backdrop-blur-sm px-3 py-2 sm:px-6 sm:py-4 opacity-85 transition-all duration-200 hover:opacity-100 hover:scale-105"
+            className="flex-none flex items-center justify-center rounded-lg sm:rounded-xl border border-white/10 bg-[#241c38]/15 backdrop-blur-sm px-3 py-2 sm:px-6 sm:py-4 opacity-85 transition-all duration-200 hover:opacity-100 hover:scale-105"
           >
             {logo.src ? (
               <img
@@ -350,7 +350,7 @@ export default function Hero() {          // <-- renamed from HeroSection
           {/* heading with inline animated course name — fades/slides in on mount */}
           <h1
             ref={headingRef}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[42px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
+            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
             <span>Build The</span>
             <ColorfulWord word="skills" colors={["#FF6B35", "#F7C531", "#3DDC97", "#4A90E2", "#E85D9C", "#8B7CFF"]} />
@@ -403,7 +403,7 @@ export default function Hero() {          // <-- renamed from HeroSection
               <motion.div
                 key={label}
                 variants={statsItemVariants}
-                className="group flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
+                className="group flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
               >
                 <Icon
                   size={16}
@@ -422,16 +422,6 @@ export default function Hero() {          // <-- renamed from HeroSection
             ))}
           </motion.div>
         </div>
-
-        {/* scroll cue */}
-        <a
-          href="#programs"
-          aria-label="Scroll to explore"
-          className="absolute bottom-6 left-1/2 z-10 flex -translate-x-1/2 flex-col items-center gap-1 text-white/50 transition hover:text-white/80"
-        >
-          <span className="font-mono text-[10px] uppercase tracking-widest">Scroll</span>
-          <ChevronDown size={16} className="animate-bounce" />
-        </a>
       </section>
 
       {/* Logo strip — sits right under the hero, naturally in the page flow

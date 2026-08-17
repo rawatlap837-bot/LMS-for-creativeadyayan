@@ -134,7 +134,7 @@ export default function ContactSection() {
   return (
     <section className="relative bg-[#F8F6FC] text-[#1F1533]">
       {/* ================= DARK HERO ================= */}
-      <div className="relative overflow-hidden bg-gradient-to-br from-[#1B0F38] via-[#2E1A55] to-[#3A2170] pb-40 pt-24 text-white sm:pt-32">
+      <div className="relative overflow-hidden bg-gradient-to-br from-[#1B0F38] via-[#2E1A55] to-[#3A2170] pb-10 sm:pb-40 pt-24 text-white sm:pt-32">
         <DotGrid className="pointer-events-none absolute right-8 top-10 hidden sm:block" />
         <div
           aria-hidden="true"
@@ -148,12 +148,12 @@ export default function ContactSection() {
           <span className="inline-block rounded-full border border-white/15 bg-white/5 px-4 py-1.5 text-xs font-semibold uppercase tracking-[0.25em] text-white/70">
             Contact Creative Adhyayan
           </span>
-          <h1 className="mt-6 text-5xl font-black tracking-tight sm:text-6xl">Contact Us</h1>
-          <p className="mt-4 text-lg text-white/60">We're just a message away</p>
+          <h1 className="mt-6 text-4xl font-black tracking-tight sm:text-6xl">Contact Us</h1>
+          <p className="mt-2 text-lg text-white/60">We're just a message away</p>
         </div>
 
         {/* ================= GET IN TOUCH + FLOATING FORM ================= */}
-        <div className="relative mx-auto mt-16 max-w-6xl px-6 py-10">
+        <div className="relative mx-auto mt-10 max-w-6xl px-6 py-10">
           <div className="grid gap-12 lg:grid-cols-5 lg:gap-10">
             {/* left: info */}
             <div className="lg:col-span-2 lg:pt-4">
@@ -191,7 +191,7 @@ export default function ContactSection() {
             <div className="lg:col-span-3">
               <form
                 onSubmit={handleSubmit}
-                className="rounded-3xl border border-white/10 bg-white/[0.07] p-8 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-10 lg:-mb-56"
+                className="rounded-3xl border border-white/10 bg-white/[0.07] p-5 shadow-2xl shadow-black/30 backdrop-blur-xl sm:p-10 lg:-mb-56"
               >
                 <h3 className="text-2xl font-black tracking-tight text-white">
                   Send us a message

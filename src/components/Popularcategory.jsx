@@ -104,7 +104,7 @@ const CategoryCard = ({ category }) => {
                     className="absolute inset-0 scale-105 grayscale-[30%] transition-all duration-700 ease-out group-hover:scale-115 group-hover:grayscale-0"
                 />
 
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0c0316] via-[#0c0316]/60 to-transparent" />
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0c0316/50] via-[#0c0316]/60 to-transparent" />
 
                 <div className="absolute inset-x-0 bottom-0 p-6">
                     <span className="mb-2 inline-block text-[11px] font-semibold uppercase tracking-[0.25em] text-[#C4B2FF]">

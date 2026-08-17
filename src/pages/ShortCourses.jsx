@@ -444,7 +444,7 @@ export default function ShortCourses() {
       </div>
 
       {/* ================= STICKY CATEGORY QUICK-NAV ================= */}
-      <div className="sticky top-0 z-30 border-b border-violet-100 bg-[#F8F6FC]/90 pt-24 backdrop-blur-sm sm:pt-6">
+      <div className="sticky top-0 z-30 border-b border-violet-100 bg-[#F8F6FC]/90 pt-10 backdrop-blur-sm sm:pt-6">
         <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto px-6 pb-3 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {COURSE_GROUPS.map((group) => {
             const GroupIcon = group.icon;
@@ -454,7 +454,7 @@ export default function ShortCourses() {
                 key={group.id}
                 type="button"
                 onClick={() => scrollToGroup(group.id)}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[11px] font-semibold transition-all ${
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[12px] sm:text-[15px] font-semibold transition-all ${
                   isActive
                     ? "border-transparent text-white shadow-md"
                     : "border-violet-100 bg-white text-[#4A3D66] hover:border-violet-200"
