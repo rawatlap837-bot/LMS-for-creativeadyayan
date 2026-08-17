@@ -5,7 +5,7 @@ import StudentLayout from './layouts/StudentLayout.jsx'
 import AdminLayout from './layouts/AdminLayout.jsx'
 
 import Home from './pages/Home.jsx'
-import Courses from './pages/Courses.jsx'
+import ShortCourses from './pages/ShortCourses.jsx'
 import CourseDetails from './pages/CourseDetails.jsx'
 import About from './pages/About.jsx'
 import Contact from './pages/Contact.jsx'
@@ -34,7 +34,7 @@ function App() {
       {/* Public site */}
       <Route element={<PublicLayout />}>
         <Route path="/" element={<Home />} />
-        <Route path="/courses" element={<Courses />} />
+        <Route path="/ShortCourses" element={<ShortCourses />} />
         <Route path="/courses/:courseId" element={<CourseDetails />} />
         <Route path="/about" element={<About />} />
         <Route path="/contact" element={<Contact />} />

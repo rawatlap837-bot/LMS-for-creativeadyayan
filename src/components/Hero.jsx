@@ -352,13 +352,13 @@ export default function Hero() {          // <-- renamed from HeroSection
             ref={headingRef}
             className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[42px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
-            <span>Build the</span>
+            <span>Build The</span>
             <ColorfulWord word="skills" colors={["#FF6B35", "#F7C531", "#3DDC97", "#4A90E2", "#E85D9C", "#8B7CFF"]} />
-            <span>that</span>
+            <span>That</span>
             <ColorfulWord word="shape" colors={["#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF", "#3DDC97"]} />
-            <span>your</span>
+            <span>Your</span>
             <ColorfulWord word="future" colors={["#E85D9C", "#3DDC97", "#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF"]} />
-            <span>with</span>
+            <span>With</span>
             <span className="text-[#C4B2FF] text-3xl sm:text-6xl">
               <SlotText
                 text={ROTATING_COURSES[courseIndex]}

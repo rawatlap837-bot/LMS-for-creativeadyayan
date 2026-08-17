@@ -46,7 +46,7 @@ const PopularCategory = ({ scrollContainerRef }) => {
         <section ref={targetRef} className="relative h-[420vh] bg-[#1a0b33]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(212,175,110,0.08),transparent_45%),radial-gradient(circle_at_80%_70%,rgba(122,58,201,0.25),transparent_50%)]" />
 
-            <div className="sticky top-0 flex h-screen flex-col items-center justify-center overflow-hidden px-6">
+            <div className="sticky top-0 flex h-screen flex-col items-center justify-center overflow-hidden px-2">
                 <span className="mb-3 text-xs font-semibold uppercase tracking-[0.35em] text-[#FFFFFF]">
                     What You Can Learn
                 </span>

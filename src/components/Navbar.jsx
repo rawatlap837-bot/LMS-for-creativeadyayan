@@ -26,9 +26,9 @@ const NAV_LINKS = [
       { label: "E-Commerce", icon: ShoppingCart, href: "/courses/e-commerce" },
     ],
   },
-  { label: "Mentors", href: "/mentors" },
-  { label: "Success Stories", href: "/success-stories" },
+  { label: "Short Courses", href: "/ShortCourses" },
   { label: "About", href: "/about" },
+  { label: "Contact", href: "/contact" },
 ];
 
 /* ------------------------------------------------------------------
@@ -130,7 +130,7 @@ export default function Navbar() {
                   onMouseLeave={() => setCoursesHover(false)}
                   aria-expanded={coursesOpen}
                   aria-haspopup="true"
-                  className="flex items-center gap-1 px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
+                  className="flex items-center gap-1 px-4 py-2 text-lg font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
                   style={coursesOpen || coursesHover ? pressed(9999) : {}}
                 >
                   {link.label}
@@ -167,7 +167,7 @@ export default function Navbar() {
                 to={link.href}
                 onMouseEnter={() => setHoveredLink(link.label)}
                 onMouseLeave={() => setHoveredLink(null)}
-                className="px-4 py-2 text-sm font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
+                className="px-4 py-2 text-lg font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
                 style={hoveredLink === link.label ? pressed(9999) : {}}
               >
                 {link.label}

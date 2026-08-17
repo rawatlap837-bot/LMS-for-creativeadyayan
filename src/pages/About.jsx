@@ -1,14 +1,25 @@
 import React from "react";
-import { ArrowUpRight, Sparkles, Target, Users2, GraduationCap } from "lucide-react";
+import { ArrowUpRight, Sparkles, Target, Users2 } from "lucide-react";
+import Sohilsir from "../assets/Images/Sohilsir.jpg";
+import Akashsir from "../assets/Images/Akashsir.jpg";
+import About from "../assets/Images/About.png";
+import { motion } from "framer-motion";
 
 /**
  * About Us section — Creative Adhyayan
  * Palette: deep violet (#2E1A55) + electric indigo (#6D3FC0) + amber spark (#E8A33D) on soft lavender (#F8F6FC)
- * Display face: bold geometric sans (tracking-tight) / Body: Inter-style default sans / Labels: mono uppercase
+ * Display face: bold geometric sans (tracking-tight) / Body: default sans / Labels: mono uppercase
  * Signature: a dotted "learning path" that threads from the eyebrow, through the mission, to the leadership cards —
  * literalizing "guided growth" instead of a generic numbered-step layout.
  */
 
+
+
+const FEATURES = [
+  { icon: Target, value: "Day 1", label: "career-ready focus" },
+  { icon: Users2, value: "1:1", label: "personalized mentorship" },
+  { icon: Sparkles, value: "Hands-on", label: "structured training", hideOnMobile: true },
+];
 const offerings = [
   "IT Courses",
   "Software Training",
@@ -26,7 +37,7 @@ const leaders = [
     years: "4 yrs",
     focus: "Digital Marketing",
     bio: "Has helped numerous brands grow online. His dedication to teaching ensures students learn the latest and most effective marketing skills.",
-    initials: "SA",
+    image: Sohilsir,
   },
   {
     name: "Akash Nagar",
@@ -34,7 +45,7 @@ const leaders = [
     years: "3 yrs",
     focus: "IT Education",
     bio: "Has mentored countless students with dedication and precision. As Academic Head, he ensures every learner receives structured, industry-focused training.",
-    initials: "AN",
+    image: Akashsir,
   },
 ];
 
@@ -63,6 +74,22 @@ function DotGrid({ className = "" }) {
   );
 }
 
+const featuresContainerVariants = {
+  hidden: {},
+  visible: {
+    transition: { staggerChildren: 0.12, delayChildren: 0.1 },
+  },
+};
+
+const featuresItemVariants = {
+  hidden: { opacity: 0, y: 14 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: { duration: 0.5, ease: "easeOut" },
+  },
+};
+
 export default function AboutSection() {
   return (
     <section className="relative overflow-hidden bg-[#F8F6FC] text-[#1F1533]">
@@ -79,12 +106,11 @@ export default function AboutSection() {
 
       {/* ---------------- HERO ---------------- */}
       <div className="relative mx-auto max-w-6xl px-6 pb-20 pt-24 sm:pt-32">
-        <div className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.25em] text-[#6D3FC0]">
-          <span className="h-px w-8 bg-[#6D3FC0]" />
+        <span className="inline-flex items-center bg-violet-100 text-violet-700 font-semibold text-xs uppercase tracking-wide px-4 py-2 rounded-full">
           About Creative Adhyayan
-        </div>
+        </span>
 
-        <h1 className="mt-6 max-w-3xl text-5xl font-black leading-[1.05] tracking-tight sm:text-6xl">
+        <h1 className="mt-6 max-w-3xl text-4xl font-black leading-[1.05] tracking-tight sm:text-6xl">
           Empowering the{" "}
           <span className="relative inline-block">
             next generation
@@ -119,10 +145,24 @@ export default function AboutSection() {
         <div className="grid gap-12 lg:grid-cols-5 lg:gap-16">
           {/* image column */}
           <div className="relative lg:col-span-2">
-            <div className="aspect-[4/5] w-full overflow-hidden rounded-[2rem] rounded-tl-none bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55] shadow-xl shadow-violet-900/20">
-              <div className="flex h-full w-full items-center justify-center">
-                <GraduationCap className="h-20 w-20 text-white/25" strokeWidth={1} />
-              </div>
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-[2rem] rounded-tl-none bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55] shadow-xl shadow-violet-900/20">
+              <img
+                src={About}
+                alt="Students collaborating at Creative Adhyayan"
+                className="h-full w-full object-cover object-center"
+                loading="lazy"
+                onError={(e) => {
+                  e.currentTarget.style.display = "none";
+                }}
+              />
+              {/* subtle violet wash to keep the palette consistent over any photo */}
+              <div
+                className="pointer-events-none absolute inset-0 mix-blend-multiply"
+                style={{
+                  background:
+                    "linear-gradient(160deg, rgba(46,26,85,0.35) 0%, rgba(109,63,192,0.05) 55%, transparent 80%)",
+                }}
+              />
             </div>
             <div className="absolute -bottom-6 -right-6 flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-lg shadow-violet-900/10">
               <Sparkles className="h-5 w-5 text-[#E8A33D]" />
@@ -167,40 +207,41 @@ export default function AboutSection() {
             </div>
 
             {/* mini stats */}
-            <div className="mt-10 grid grid-cols-2 gap-6 border-t border-violet-100 pt-8 sm:grid-cols-3">
-              <div>
-                <div className="flex items-center gap-1.5 text-[#2E1A55]">
-                  <Target className="h-4 w-4 text-[#E8A33D]" />
-                  <span className="text-2xl font-black">Day 1</span>
-                </div>
-                <p className="mt-1 text-sm text-[#4A3D66]">career-ready focus</p>
-              </div>
-              <div>
-                <div className="flex items-center gap-1.5 text-[#2E1A55]">
-                  <Users2 className="h-4 w-4 text-[#E8A33D]" />
-                  <span className="text-2xl font-black">1:1</span>
-                </div>
-                <p className="mt-1 text-sm text-[#4A3D66]">personalized mentorship</p>
-              </div>
-              <div className="hidden sm:block">
-                <div className="flex items-center gap-1.5 text-[#2E1A55]">
-                  <Sparkles className="h-4 w-4 text-[#E8A33D]" />
-                  <span className="text-2xl font-black">Hands-on</span>
-                </div>
-                <p className="mt-1 text-sm text-[#4A3D66]">structured training</p>
-              </div>
-            </div>
+            <motion.div
+              initial="hidden"
+              whileInView="visible"
+              viewport={{ once: true, amount: 0.3 }}
+              variants={featuresContainerVariants}
+              className="mt-10 grid grid-cols-2 gap-4 border-t border-violet-100 pt-8 sm:grid-cols-3 sm:gap-6"
+            >
+              {FEATURES.map(({ icon: Icon, value, label, hideOnMobile }) => (
+                <motion.div
+                  key={label}
+                  variants={featuresItemVariants}
+                  className={`group rounded-2xl border border-violet-200 bg-white/60 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md hover:shadow-violet-200/50 ${hideOnMobile ? "hidden sm:block" : ""
+                    }`}
+                >
+                  <div className="flex items-center gap-2 text-[#2E1A55]">
+                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8A33D]/10 transition-colors duration-300 group-hover:bg-[#E8A33D]/20">
+                      <Icon className="h-4 w-4 text-[#E8A33D]" />
+                    </span>
+                    <span className="text-2xl font-black">{value}</span>
+                  </div>
+                  <p className="mt-1.5 text-sm text-[#4A3D66]">{label}</p>
+                </motion.div>
+              ))}
+            </motion.div>
           </div>
         </div>
       </div>
 
       {/* ---------------- LEADERSHIP ---------------- */}
       <div className="relative bg-white/60">
-        <div className="mx-auto max-w-6xl px-6 py-24">
+        <div className="mx-auto max-w-6xl px-6 py-1">
           <div className="max-w-xl">
-            <p className="font-mono text-xs uppercase tracking-[0.25em] text-[#6D3FC0]">
+            <span className="inline-flex items-center bg-violet-100 text-violet-700 font-semibold text-xs uppercase tracking-wide px-4 py-2 rounded-full">
               The people behind it
-            </p>
+            </span>
             <h2 className="mt-4 text-4xl font-black tracking-tight sm:text-5xl">
               Leadership that inspires growth
             </h2>
@@ -228,32 +269,44 @@ export default function AboutSection() {
             {leaders.map((leader) => (
               <div
                 key={leader.name}
-                className="group relative rounded-3xl border border-violet-100 bg-white p-8 shadow-sm shadow-violet-900/5 transition-shadow hover:shadow-lg hover:shadow-violet-900/10"
+                className="group relative overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm shadow-violet-900/5 transition-shadow hover:shadow-lg hover:shadow-violet-900/10"
               >
-                <div className="flex items-start justify-between">
-                  <div
-                    className="flex h-16 w-16 items-center justify-center rounded-2xl text-lg font-black text-white"
-                    style={{
-                      background: "linear-gradient(135deg, #6D3FC0, #2E1A55)",
+                {/* photo */}
+                <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55]">
+                  <img
+                    src={leader.image}
+                    alt={leader.name}
+                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]"
+                    loading="lazy"
+                    onError={(e) => {
+                      e.currentTarget.style.display = "none";
                     }}
-                  >
-                    {leader.initials}
-                  </div>
-                  <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold text-[#B5772A]">
+                  />
+                  <div
+                    className="pointer-events-none absolute inset-0"
+                    style={{
+                      background:
+                        "linear-gradient(to top, rgba(46,26,85,0.55) 0%, rgba(46,26,85,0) 45%)",
+                    }}
+                  />
+                  <span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#2E1A55] shadow">
                     {leader.years} experience
                   </span>
                 </div>
 
-                <h3 className="mt-6 text-xl font-bold">{leader.name}</h3>
-                <p className="text-sm font-medium text-[#6D3FC0]">{leader.role}</p>
+                {/* content */}
+                <div className="p-8">
+                  <h3 className="text-xl font-bold">{leader.name}</h3>
+                  <p className="text-sm font-medium text-[#6D3FC0]">{leader.role}</p>
 
-                <p className="mt-4 text-sm leading-relaxed text-[#4A3D66]">
-                  {leader.bio}
-                </p>
+                  <p className="mt-4 text-sm leading-relaxed text-[#4A3D66]">
+                    {leader.bio}
+                  </p>
 
-                <div className="mt-6 flex items-center gap-1.5 text-sm font-medium text-[#2E1A55] opacity-0 transition-opacity group-hover:opacity-100">
-                  Focus area: {leader.focus}
-                  <ArrowUpRight className="h-4 w-4" />
+                  <div className="mt-6 flex items-center gap-1.5 text-sm font-medium text-[#2E1A55] opacity-0 transition-opacity group-hover:opacity-100">
+                    Focus area: {leader.focus}
+                    <ArrowUpRight className="h-4 w-4" />
+                  </div>
                 </div>
               </div>
             ))}
