@@ -16,14 +16,14 @@ const StyledWrapper = styled.div`
   justify-content: center;
 
   .button {
-    width: min(220px, 80vw);
+    width: 160px;
     padding: 0;
     border: none;
     transform: rotate(3deg);
     transform-origin: center;
     font-family: "Gochi Hand", cursive, sans-serif;
     text-decoration: none;
-    font-size: clamp(16px, 5vw, 22px);
+    font-size: 18px;
     cursor: pointer;
     padding-bottom: 4px;
     border-radius: 8px;
@@ -35,7 +35,7 @@ const StyledWrapper = styled.div`
   .button span {
     background: #f1f5f8;
     display: block;
-    padding: 0.9rem 1.2rem;
+    padding: 0.55rem 0.7rem;
     border-radius: 8px;
     border: 2px solid #494a4b;
     white-space: nowrap;
@@ -49,7 +49,32 @@ const StyledWrapper = styled.div`
 
   @media (max-width: 380px) {
     .button {
+      width: 150px;
+      font-size: 16px;
       transform: rotate(2deg);
+    }
+    .button span {
+      padding: 0.5rem 0.6rem;
+    }
+  }
+
+  @media (min-width: 640px) {
+    .button {
+      width: 200px;
+      font-size: 22px;
+    }
+    .button span {
+      padding: 0.75rem 1rem;
+    }
+  }
+
+  @media (min-width: 1024px) {
+    .button {
+      width: 220px;
+      font-size: 24px;
+    }
+    .button span {
+      padding: 0.85rem 1.1rem;
     }
   }
 `;

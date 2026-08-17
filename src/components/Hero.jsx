@@ -4,6 +4,7 @@ import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
 import { ScrollSmoother } from "gsap/ScrollSmoother";
 import Button from "../components/Buttons"; // adjust path to wherever you save it
+import { motion, animate, useInView } from "framer-motion";
 
 
 gsap.registerPlugin(ScrollTrigger, ScrollSmoother);
@@ -46,11 +47,71 @@ const QUICK_CATEGORIES = [
   { label: "Software Dev", icon: Cpu, href: "/courses/software-dev" },
 ];
 
+// numeric `value` + optional `decimals`/`prefix`/`suffix` so AnimatedStatValue
+// can count up to the real number instead of just fading in static text
 const STATS = [
-  { icon: BookOpen, value: "24", label: "Courses" },
-  { icon: Users, value: "12,000+", label: "Learners" },
-  { icon: Award, value: "4.8 / 5", label: "Avg. rating" },
+  { icon: BookOpen, value: 24, label: "Courses" },
+  { icon: Users, value: 12000, suffix: "+", label: "Learners" },
+  { icon: Award, value: 4.8, decimals: 1, suffix: " / 5", label: "Avg. rating" },
 ];
+
+/**
+ * Responsive breakpoint hook — used so GradientWaves gets stronger
+ * amplitude/brightness/zoom on small screens, where the shader otherwise
+ * reads as too subtle against the readability scrim.
+ */
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(
+    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  );
+
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < breakpoint);
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
+/**
+ * ---- Animated count-up number ----
+ *
+ * Animates from 0 up to `value` once the element scrolls into view.
+ * Supports decimals (e.g. 4.8), thousands separators (e.g. 12,000),
+ * and an optional prefix/suffix (e.g. "+", " / 5").
+ */
+function AnimatedStatValue({ value, decimals = 0, prefix = "", suffix = "", className }) {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, amount: 0.6 });
+  const [display, setDisplay] = useState((0).toFixed(decimals));
+
+  useEffect(() => {
+    if (!isInView) return;
+
+    const controls = animate(0, value, {
+      duration: 1.8,
+      ease: [0.16, 1, 0.3, 1], // easeOutExpo-ish — quick start, gentle settle
+      onUpdate(latest) {
+        const rounded = decimals ? latest.toFixed(decimals) : Math.round(latest);
+        setDisplay(Number(rounded).toLocaleString(undefined, {
+          minimumFractionDigits: decimals,
+          maximumFractionDigits: decimals,
+        }));
+      },
+    });
+
+    return () => controls.stop();
+  }, [isInView, value, decimals]);
+
+  return (
+    <span ref={ref} className={className}>
+      {prefix}
+      {display}
+      {suffix}
+    </span>
+  );
+}
 
 /**
  * ---- Carousel logos (Tailwind version) ----
@@ -141,6 +202,8 @@ function LogoCarousel({
 export default function Hero() {          // <-- renamed from HeroSection
   const [courseIndex, setCourseIndex] = useState(0);
   const headingRef = useRef(null);
+  const waveRef = useRef(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -169,10 +232,49 @@ export default function Hero() {          // <-- renamed from HeroSection
           // markers: true, // uncomment while tuning to see the trigger line
         },
       });
+
+      // Smooth fade-in for the GradientWaves background on mount —
+      // starts invisible and eases up to full opacity so the wave
+      // doesn't just "pop in" the instant the shader initializes.
+      gsap.fromTo(
+        waveRef.current,
+        { opacity: 0 },
+        { opacity: 1, duration: 2.2, ease: "power2.out" }
+      );
     }, headingRef);
 
     return () => ctx.revert();
   }, []);
+
+  function ColorfulWord({ word, colors }) {
+    const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
+    return (
+      <span className="inline-flex">
+        {capitalized.split("").map((char, i) => (
+          <span key={i} style={{ color: colors[i % colors.length] }}>
+            {char}
+          </span>
+        ))}
+      </span>
+    );
+  }
+
+  // Stagger container + item variants for the stats strip fade-in
+  const statsContainerVariants = {
+    hidden: {},
+    visible: {
+      transition: { staggerChildren: 0.12, delayChildren: 0.1 },
+    },
+  };
+
+  const statsItemVariants = {
+    hidden: { opacity: 0, y: 14 },
+    visible: {
+      opacity: 1,
+      y: 0,
+      transition: { duration: 0.5, ease: "easeOut" },
+    },
+  };
 
   return (
     <>
@@ -181,23 +283,23 @@ export default function Hero() {          // <-- renamed from HeroSection
         style={{ background: "#150A30" }}
       >
         {/* full-bleed animated background — dark violet palette */}
-        <div className="gradient-waves-container absolute inset-0 z-0">
+        <div ref={waveRef} className="gradient-waves-container absolute inset-0 z-0">
           <GradientWaves
             horizonColor="#5227FF"
             waveColor="#FF9FFC"
             crestColor="#FFFFFF"
             speed={0.4}
-            amplitude={2.5}
-            waveScale={0.6}
+            amplitude={isMobile ? 4 : 2.5}
+            waveScale={isMobile ? 0.9 : 0.6}
             waveRatio={0.9}
-            swell={35}
-            turbulence={20}
+            swell={isMobile ? 50 : 35}
+            turbulence={isMobile ? 30 : 20}
             tilt={1.11}
-            zoom={1}
-            height={5.5}
-            fogDepth={15}
-            detail="medium"
-            brightness={1}
+            zoom={isMobile ? 1.3 : 1}
+            height={isMobile ? 7 : 5.5}
+            fogDepth={isMobile ? 10 : 15}
+            detail={isMobile ? "high" : "medium"}
+            brightness={isMobile ? 1.4 : 1}
             opacity={1}
             mouseInteraction
             parallaxStrength={0.5}
@@ -219,13 +321,14 @@ export default function Hero() {          // <-- renamed from HeroSection
         <div
           className="pointer-events-none absolute inset-0 z-[2]"
           style={{
-            background:
-              "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)",
+            background: isMobile
+              ? "linear-gradient(180deg, rgba(10,4,26,0.30) 0%, rgba(10,4,26,0.02) 35%, rgba(10,4,26,0.40) 100%)"
+              : "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)",
           }}
         />
 
         {/* content — single straight centered column, no side layout */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-24 text-center font-body sm:px-6 sm:py-28">
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 text-center font-body sm:px-6 sm:py-28">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
             {/* soft ambient glow behind everything */}
             <span
@@ -247,13 +350,19 @@ export default function Hero() {          // <-- renamed from HeroSection
           {/* heading with inline animated course name — fades/slides in on mount */}
           <h1
             ref={headingRef}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-3xl font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
+            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[42px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
-            <span>Build the skills that shape your future with</span>
-            <span className="text-[#C4B2FF]">
+            <span>Build the</span>
+            <ColorfulWord word="skills" colors={["#FF6B35", "#F7C531", "#3DDC97", "#4A90E2", "#E85D9C", "#8B7CFF"]} />
+            <span>that</span>
+            <ColorfulWord word="shape" colors={["#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF", "#3DDC97"]} />
+            <span>your</span>
+            <ColorfulWord word="future" colors={["#E85D9C", "#3DDC97", "#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF"]} />
+            <span>with</span>
+            <span className="text-[#C4B2FF] text-3xl sm:text-6xl">
               <SlotText
                 text={ROTATING_COURSES[courseIndex]}
-                options={{ direction: "up", stagger: 45 }}
+                options={{ direction: "up", stagger: 40 }}
               />
             </span>
           </h1>
@@ -272,37 +381,46 @@ export default function Hero() {          // <-- renamed from HeroSection
               <Link
                 key={label}
                 to={href}
-                className="flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 text-xs font-medium text-white/80 backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10 hover:text-white"
+                className="group flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10"
               >
                 <Icon size={13} className="text-[#C4B2FF]" />
-                {label}
+                <span className="text-xs font-medium text-white/80 transition ease-out group-hover:text-white">
+                  {label}
+                </span>
               </Link>
             ))}
           </div>
 
-          {/* social proof strip, centered */}
-          <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
-            {/* faint static ring so the border reads */}
-            <span className="absolute inset-0 rounded-full ring-1 ring-white/10" />
-          </span>
-
-          {/* stats strip */}
-          <div className="mt-10 grid grid-cols-3 gap-3 sm:gap-6">
-            {STATS.map(({ icon: Icon, value, label }) => (
-              <div
+          {/* stats strip — cards fade + rise in staggered, numbers count up from 0 */}
+          <motion.div
+            initial="hidden"
+            whileInView="visible"
+            viewport={{ once: true, amount: 0.3 }}
+            variants={statsContainerVariants}
+            className="mt-10 grid grid-cols-3 gap-3 sm:gap-6"
+          >
+            {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
+              <motion.div
                 key={label}
-                className="flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-sm sm:px-8"
+                variants={statsItemVariants}
+                className="group flex flex-col items-center gap-1.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-4 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
               >
-                <Icon size={16} className="text-[#C4B2FF]" />
-                <span className="font-display text-lg font-semibold text-white sm:text-xl">
-                  {value}
-                </span>
+                <Icon
+                  size={16}
+                  className="text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
+                />
+                <AnimatedStatValue
+                  value={value}
+                  decimals={decimals}
+                  suffix={suffix}
+                  className="font-display text-lg font-semibold tabular-nums text-white sm:text-xl"
+                />
                 <span className="text-[10px] uppercase tracking-wide text-white/60 sm:text-xs">
                   {label}
                 </span>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </div>
 
         {/* scroll cue */}
