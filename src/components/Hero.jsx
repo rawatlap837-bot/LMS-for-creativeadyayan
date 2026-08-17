@@ -183,23 +183,23 @@ export default function Hero() {          // <-- renamed from HeroSection
         {/* full-bleed animated background — dark violet palette */}
         <div className="gradient-waves-container absolute inset-0 z-0">
           <GradientWaves
-            horizonColor="#341539"
-            waveColor="#BE4BDB"
-            crestColor="#FFFFFFF"
+            horizonColor="#5227FF"
+            waveColor="#FF9FFC"
+            crestColor="#FFFFFF"
             speed={0.4}
-            amplitude={2.8}
+            amplitude={2.5}
             waveScale={0.6}
             waveRatio={0.9}
             swell={35}
-            turbulence={22}
+            turbulence={20}
             tilt={1.11}
             zoom={1}
-            height={4.5}
-            fogDepth={18}
+            height={5.5}
+            fogDepth={15}
             detail="medium"
-            brightness={1.0}
+            brightness={1}
             opacity={1}
-            cloudiness={0.95}
+            mouseInteraction
             parallaxStrength={0.5}
             grain
             grainIntensity={0.05}
@@ -247,7 +247,7 @@ export default function Hero() {          // <-- renamed from HeroSection
           {/* heading with inline animated course name — fades/slides in on mount */}
           <h1
             ref={headingRef}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-display text-3xl font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
+            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-3xl font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
             <span>Build the skills that shape your future with</span>
             <span className="text-[#C4B2FF]">

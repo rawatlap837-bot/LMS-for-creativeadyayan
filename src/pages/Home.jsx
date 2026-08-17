@@ -1,12 +1,12 @@
 import Hero from "../components/Hero";
 import Navbar from "../components/Navbar";
 import Testimonials from "../components/Testimonials";
-import CTA from "../components/CTA";
-import Footer from "../components/Footer";
 import TrustSection from "../components/TrustSection";
 import PopularCategory from "../components/Popularcategory";
 import DashboardSection from "../components/Dashboard";
-
+import InstructorExcellence from "../components/Instructorexcellence";
+import LiveCourses from "../components/Livecourses";
+import FAQ from "../components/FAQ";
 
 
 export default function Home() {
@@ -17,9 +17,10 @@ export default function Home() {
       <TrustSection />
       <PopularCategory />
       <DashboardSection />
+      <InstructorExcellence />
+      <LiveCourses />
+      <FAQ />
       <Testimonials />
-      <CTA />
-      <Footer />
     </>
   );
 }
