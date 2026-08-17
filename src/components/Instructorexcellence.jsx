@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
-import ClassRoom from "../assets/Images/Classroom.png"
+import ClassRoom from "../assets/Images/classroom.png"
 import {
   Star,
   Megaphone,
