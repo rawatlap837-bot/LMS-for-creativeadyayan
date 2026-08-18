@@ -1,22 +1,41 @@
-import { useCallback, useEffect, useRef } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef } from 'react';
 import gsap from 'gsap';
 
-const Cubes = ({
-  gridSize = 10,
-  cubeSize,
-  maxAngle = 45,
-  radius = 3,
-  easing = 'power3.out',
-  duration = { enter: 0.3, leave: 0.6 },
-  cellGap,
-  borderStyle = '1px solid #fff',
-  faceColor = '#120F17',
-  shadow = false,
-  autoAnimate = true,
-  rippleOnClick = true,
-  rippleColor = '#fff',
-  rippleSpeed = 2
-}) => {
+/**
+ * Cubes — now a forwardRef component. Besides reacting to the pointer over
+ * its own grid (unchanged), it exposes two imperative methods so a parent
+ * component can make the grid react to things happening elsewhere on the
+ * page (e.g. typing in a form):
+ *
+ *   ref.current.pulse(row?, col?)   — tilt the cubes near (row, col) briefly,
+ *                                      like a moment of "attention". Defaults
+ *                                      to a random point near the center.
+ *   ref.current.ripple(row?, col?)  — the same expanding color ripple used
+ *                                      on click, fired programmatically.
+ *
+ * Both temporarily suspend the idle auto-animation so the pulse reads
+ * clearly instead of blending into the ambient drift.
+ */
+const Cubes = forwardRef(function Cubes(
+  {
+    gridSize = 10,
+    cubeSize = 40,
+    maxAngle = 45,
+    radius = 3,
+    easing = 'power3.out',
+    duration = { enter: 0.3, leave: 0.6 },
+    cellGap,
+    borderStyle = '1px solid rgba(216, 189, 250, 0.55)',
+    faceColor = '#3A2170',
+    shadow = '0 0 10px rgba(139, 95, 224, 0.45)',
+    autoAnimate = true,
+    rippleOnClick = true,
+    rippleColor = '#B497CF',
+    rippleSpeed = 2,
+    className
+  },
+  ref
+) {
   const sceneRef = useRef(null);
   const rafRef = useRef(null);
   const idleTimerRef = useRef(null);
@@ -128,19 +147,9 @@ const Cubes = ({
     resetAll();
   }, [resetAll]);
 
-  const onClick = useCallback(
-    e => {
-      if (!rippleOnClick || !sceneRef.current) return;
-      const rect = sceneRef.current.getBoundingClientRect();
-      const cellW = rect.width / gridSize;
-      const cellH = rect.height / gridSize;
-
-      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
-      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
-
-      const colHit = Math.floor((clientX - rect.left) / cellW);
-      const rowHit = Math.floor((clientY - rect.top) / cellH);
-
+  const rippleAt = useCallback(
+    (rowHit, colHit) => {
+      if (!sceneRef.current) return;
       const baseRingDelay = 0.15;
       const baseAnimDur = 0.3;
       const baseHold = 0.6;
@@ -180,7 +189,56 @@ const Cubes = ({
           });
         });
     },
-    [rippleOnClick, gridSize, faceColor, rippleColor, rippleSpeed]
+    [faceColor, rippleColor, rippleSpeed]
+  );
+
+  const onClick = useCallback(
+    e => {
+      if (!rippleOnClick || !sceneRef.current) return;
+      const rect = sceneRef.current.getBoundingClientRect();
+      const cellW = rect.width / gridSize;
+      const cellH = rect.height / gridSize;
+
+      const clientX = e.clientX || (e.touches && e.touches[0].clientX);
+      const clientY = e.clientY || (e.touches && e.touches[0].clientY);
+
+      const colHit = Math.floor((clientX - rect.left) / cellW);
+      const rowHit = Math.floor((clientY - rect.top) / cellH);
+
+      rippleAt(rowHit, colHit);
+    },
+    [rippleOnClick, gridSize, rippleAt]
+  );
+
+  // Briefly mark the grid "active" (suspending idle auto-drift) so a
+  // programmatic pulse/ripple reads clearly instead of blending into the
+  // ambient animation, then release control back after `holdMs`.
+  const holdActive = useCallback((holdMs = 900) => {
+    userActiveRef.current = true;
+    if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    idleTimerRef.current = setTimeout(() => {
+      userActiveRef.current = false;
+    }, holdMs);
+  }, []);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      pulse: (row, col) => {
+        const r = row ?? gridSize / 2 + (Math.random() - 0.5) * 2;
+        const c = col ?? gridSize / 2 + (Math.random() - 0.5) * 2;
+        holdActive();
+        if (rafRef.current) cancelAnimationFrame(rafRef.current);
+        rafRef.current = requestAnimationFrame(() => tiltAt(r, c));
+      },
+      ripple: (row, col) => {
+        const r = row ?? Math.floor(gridSize / 2);
+        const c = col ?? Math.floor(gridSize / 2);
+        holdActive(1200);
+        rippleAt(r, c);
+      }
+    }),
+    [gridSize, holdActive, tiltAt, rippleAt]
   );
 
   useEffect(() => {
@@ -257,14 +315,14 @@ const Cubes = ({
     '--cube-face-shadow': shadow === true ? '0 0 6px rgba(0,0,0,.5)' : shadow || 'none',
     ...(cubeSize
       ? {
-          width: `${gridSize * cubeSize}px`,
-          height: `${gridSize * cubeSize}px`
-        }
+        width: `${gridSize * cubeSize}px`,
+        height: `${gridSize * cubeSize}px`
+      }
       : {})
   };
 
   return (
-    <div className="relative w-1/2 max-md:w-11/12 aspect-square" style={wrapperStyle}>
+    <div className={`relative aspect-square ${className || 'w-1/2 max-md:w-11/12'}`} style={wrapperStyle}>
       <div ref={sceneRef} className="grid w-full h-full" style={sceneStyle}>
         {cells.map((_, r) =>
           cells.map((__, c) => (
@@ -336,6 +394,6 @@ const Cubes = ({
       </div>
     </div>
   );
-};
+});
 
 export default Cubes;

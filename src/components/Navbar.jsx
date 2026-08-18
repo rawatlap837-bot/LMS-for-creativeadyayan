@@ -58,6 +58,11 @@ const pressed = (radius = 9999) => ({
   boxShadow: `inset 3px 3px 6px ${DARK}, inset -3px -3px 6px ${LIGHT}`,
 });
 
+// Where the "Enroll now" CTA sends people — same registration screen as
+// the "Create an account" link on the login form, so both entry points
+// land in one place.
+const REGISTER_ROUTE = "/register";
+
 export default function Navbar() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [coursesOpen, setCoursesOpen] = useState(false);
@@ -190,7 +195,7 @@ export default function Navbar() {
 
           <button
             type="button"
-            onClick={() => navigate("/enroll")}
+            onClick={() => navigate(REGISTER_ROUTE)}
             onMouseEnter={(e) =>
               Object.assign(e.currentTarget.style, {
                 boxShadow: `inset 4px 4px 8px rgba(0,0,0,0.45), inset -4px -4px 8px rgba(255,255,255,0.06)`,
@@ -310,7 +315,7 @@ export default function Navbar() {
                 type="button"
                 onClick={() => {
                   setMobileOpen(false);
-                  navigate("/enroll");
+                  navigate(REGISTER_ROUTE);
                 }}
                 onMouseEnter={(e) =>
                   Object.assign(e.currentTarget.style, {
