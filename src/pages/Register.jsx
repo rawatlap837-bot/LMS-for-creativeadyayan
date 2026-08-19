@@ -224,7 +224,7 @@ export default function RegisterForm() {
         </div>
 
         {/* ================= RIGHT — FORM ================= */}
-        <div className="flex flex-1 items-center justify-center px-6 py-40">
+        <div className="flex flex-1 items-center justify-center px-3 py-24">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
@@ -232,7 +232,7 @@ export default function RegisterForm() {
             className="w-full max-w-sm rounded-3xl bg-white/90 p-8 shadow-xl shadow-violet-900/10 backdrop-blur-sm lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0"
           >
             {/* mobile-only brand mark */}
-            <h2 className="text-3xl font-black tracking-tight">Create your account</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">Create your account</h2>
             <p className="mt-2 text-sm text-[#6b5f87]">
               Already have one?{" "}
               <a href="/login" className="font-semibold text-[#6D3FC0] hover:underline">

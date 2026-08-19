@@ -67,6 +67,10 @@ function firebaseAuthErrorMessage(error) {
   }
 }
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 export default function LoginForm() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -97,6 +101,7 @@ export default function LoginForm() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    scrollToTop();
     setErrorMsg("");
 
     if (!form.email || !form.password) {
@@ -122,6 +127,7 @@ export default function LoginForm() {
   };
 
   const handleGoogleSignIn = async () => {
+    scrollToTop();
     setErrorMsg("");
     setGoogleLoading(true);
     try {
@@ -187,26 +193,14 @@ export default function LoginForm() {
           </motion.div>
         </div>
 
-        <div className="flex flex-1 items-center justify-center px-6 py-16">
+        <div className="flex flex-1 items-center justify-center px-3 py-24">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-sm rounded-3xl bg-white/90 p-8 shadow-xl shadow-violet-900/10 backdrop-blur-sm lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0"
           >
-            <div className="mb-8 flex items-center gap-2 lg:hidden">
-              <span
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-white"
-                style={{ background: "linear-gradient(135deg, #6D3FC0, #2E1A55)" }}
-              >
-                <GraduationCap className="h-5 w-5" />
-              </span>
-              <span className="text-lg font-black tracking-tight text-[#2E1A55]">
-                Creative Adhyayan
-              </span>
-            </div>
-
-            <h2 className="text-3xl font-black tracking-tight">Log in</h2>
+            <h2 className="text-3xl font-semibold tracking-tight">Log in</h2>
             <p className="mt-2 text-sm text-[#6b5f87]">
               New here?{" "}
               <a href="/register" className="font-semibold text-[#6D3FC0] hover:underline">

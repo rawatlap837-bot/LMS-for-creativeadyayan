@@ -1,9 +1,10 @@
 // src/firebase.js
 //
-// Firebase app initialization. Sets up Auth (what Login.jsx needs) and
-// Analytics (optional — only initializes if VITE_FIREBASE_MEASUREMENT_ID is
-// set, since Analytics doesn't work in non-browser/SSR contexts and isn't
-// needed for auth to function).
+// Firebase app initialization. Sets up Auth (what Login.jsx needs), Firestore
+// (what the Dashboard needs for live data), Storage (what Assignments.jsx
+// needs for file submissions), and Analytics (optional — only initializes if
+// VITE_FIREBASE_MEASUREMENT_ID is set, since Analytics doesn't work in
+// non-browser/SSR contexts and isn't needed for auth to function).
 //
 // Requires: npm install firebase
 //
@@ -24,9 +25,14 @@
 // "Your apps" → SDK setup and configuration. Vite only exposes env vars
 // prefixed with VITE_ to client code, and .env.local is gitignored by
 // default in Vite projects.
+//
+// Note: `storageBucket` above must be set for the Storage export below to
+// work — it's the same config block, no extra env var needed.
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
+import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
 
 const firebaseConfig = {
@@ -42,6 +48,8 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
+export const db = getFirestore(app);
+export const storage = getStorage(app);
 
 // Analytics only runs in a real browser (it checks for things like
 // cookie/indexedDB support), so it's initialized async and guarded rather

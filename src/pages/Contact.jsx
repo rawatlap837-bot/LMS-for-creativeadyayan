@@ -36,6 +36,10 @@ const MAP_QUERY = encodeURIComponent(
   "Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062"
 );
 
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
 function DotGrid({ className = "", dot = "fill-white/25" }) {
   return (
     <svg
@@ -112,6 +116,7 @@ export default function ContactSection() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    scrollToTop();
     setStatus("sending");
     // TODO: wire this up to your actual endpoint / API call
     await new Promise((resolve) => setTimeout(resolve, 900));
@@ -123,6 +128,7 @@ export default function ContactSection() {
   const handleNewsletter = async (e) => {
     e.preventDefault();
     if (!newsletterEmail) return;
+    scrollToTop();
     setNewsletterStatus("sending");
     // TODO: wire this up to your actual newsletter endpoint
     await new Promise((resolve) => setTimeout(resolve, 700));
