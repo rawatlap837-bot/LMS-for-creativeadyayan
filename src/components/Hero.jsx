@@ -245,20 +245,6 @@ export default function Hero() {          // <-- renamed from HeroSection
 
     return () => ctx.revert();
   }, []);
-
-  function ColorfulWord({ word, colors }) {
-    const capitalized = word.charAt(0).toUpperCase() + word.slice(1);
-    return (
-      <span className="inline-flex">
-        {capitalized.split("").map((char, i) => (
-          <span key={i} style={{ color: colors[i % colors.length] }}>
-            {char}
-          </span>
-        ))}
-      </span>
-    );
-  }
-
   // Stagger container + item variants for the stats strip fade-in
   const statsContainerVariants = {
     hidden: {},
@@ -352,13 +338,14 @@ export default function Hero() {          // <-- renamed from HeroSection
             ref={headingRef}
             className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
-            <span>Build The</span>
-            <ColorfulWord word="skills" colors={["#FF6B35", "#F7C531", "#3DDC97", "#4A90E2", "#E85D9C", "#8B7CFF"]} />
-            <span>That</span>
-            <ColorfulWord word="shape" colors={["#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF", "#3DDC97"]} />
-            <span>Your</span>
-            <ColorfulWord word="future" colors={["#E85D9C", "#3DDC97", "#F7C531", "#4A90E2", "#FF6B35", "#8B7CFF"]} />
-            <span>With</span>
+            <span>Build The 
+              <span className="text-[#7ce681] relative inline-block border-[4px] border-black bg-white px-2 py-1 text-black shadow-[2px_2px_0px_#000] rotate-1 "> SKILL </span>
+              That 
+              <span className="text-[#ffffff] relative inline-block
+                border-[4px] border-black bg-[#FFD43B] px-1 py-2 text-black shadow-[2px_2px_0px_#000] rotate-1"> Shape </span>
+               Your 
+               <span className="text-[#fff7b2] relative inline-block border-[2px] border-black bg-orange-500  px-2 py-1 text-black shadow-[2px_2px_0px_#000] rotate-10 "> FUTURE </span>
+                With</span>
             <span className="text-[#C4B2FF] text-3xl sm:text-6xl">
               <SlotText
                 text={ROTATING_COURSES[courseIndex]}

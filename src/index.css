@@ -1,5 +1,6 @@
 @import "tw-animate-css";
 @import "@fontsource-variable/geist";
+@import "shadcn/tailwind.css";
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -157,5 +158,15 @@ body {
   }
   html {
     @apply font-sans;
+  }
+  .theme {
+    --font-heading: var(--font-sans);
+    --font-sans: 'Geist Variable', sans-serif;
+  }
+  * {
+        * {
+       @apply border-border;
+       outline-color: hsl(var(--ring) / 0.5);
+     }
   }
 }

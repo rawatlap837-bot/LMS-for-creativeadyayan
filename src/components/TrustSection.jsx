@@ -1,139 +1,293 @@
-import React from "react";
-import { Play, Share2, Clock } from "lucide-react";
-import crew from "../assets/Images/crew.png";
-import study from "../assets/Images/study.png";
+import React, { useEffect, useRef, useState } from "react";
+import { Users, Briefcase, PlayCircle, ArrowRight } from "lucide-react";
+import PixelSwap from "../Animiations/PixelSwap";
 
-/**
- * LearningEnvironmentSection
- *
- * 3-up row (2 photo cards + 1 video card) + a full-width banner underneath.
- * Palette pulled back from the harsh orange/indigo to a soft lavender +
- * deep-violet text combo that matches the Creative Adhyayan brand purple.
- */
+const BG = "#FFFFFF";
+const INK_TEXT = "#241F3D";
+const MUTED = "#6E6789";
+const VIOLET = "#7C6AE8";
+const VIOLET_DEEP = "#5B4FC4";
+const VIOLET_SOFT = "#EDEAFB";
+const VIOLET_LINE = "#B7ACF2";
 
-const cardRadius = { borderRadius: "clamp(16px, 2.5vw, 28px)" };
+const CARDS = [
+  {
+    id: "students",
+    eyebrow: "Our Reach",
+    icon: Users,
+    stat: "1000+",
+    title: "Students Trained",
+    desc: "In Digital Marketing and AI Excellence.",
+  },
+  {
+    id: "practical",
+    eyebrow: "Our Method",
+    icon: Briefcase,
+    stat: "100%",
+    title: "Practical Training",
+    desc: "Hands-on learning with real internship opportunities.",
+  },
+  {
+    id: "environment",
+    eyebrow: "Our Space",
+    icon: PlayCircle,
+    stat: "",
+    title: "Learning Environment",
+    desc: "Expert-led training inside modern infrastructure.",
+  },
+];
 
-// Softened versions of the original orange + indigo — pastel fills with a
-// deep-tinted text/accent color instead of white-on-saturated.
-const PALETTE = {
-  orange: { bg: "#FCE3D6", text: "#B4552B", accent: "#F0854D" },
-  indigo: { bg: "#E4E1F8", text: "#453C86", accent: "#6C5DD3" },
-};
-
-function PhotoCard({ image, caption, tone = "orange" }) {
-  const c = PALETTE[tone];
+function SpokeIcon({ icon: Icon }) {
   return (
     <div
-      style={{ ...cardRadius, backgroundColor: c.bg }}
-      className="overflow-hidden shadow-sm"
+      className="flex h-10 w-10 items-center justify-center rounded-xl"
+      style={{ backgroundColor: VIOLET_SOFT, color: VIOLET_DEEP }}
     >
-      <img
-        src={image}
-        alt={caption}
-        className="h-56 w-full object-cover sm:h-64"
+      <Icon size={20} />
+    </div>
+  );
+}
+
+function SpokeCard({ card, align = "left" }) {
+  const { icon, eyebrow, stat, title, desc } = card;
+  return (
+    <div
+      className="pointer-events-auto w-full max-w-[300px] rounded-2xl border p-5"
+      style={{
+        backgroundColor: "#FFFFFF",
+        borderColor: "rgba(124,106,232,0.18)",
+        boxShadow: "0 8px 30px rgba(124,106,232,0.10)",
+      }}
+    >
+      <div className={`flex items-start gap-3 ${align === "right" ? "flex-row-reverse text-right" : ""}`}>
+        <SpokeIcon icon={icon} />
+        <div>
+          <p
+            className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+            style={{ color: MUTED }}
+          >
+            {eyebrow}
+          </p>
+          {stat && (
+            <p className="mt-0.5 text-2xl font-bold leading-none" style={{ color: VIOLET_DEEP }}>
+              {stat}
+            </p>
+          )}
+        </div>
+      </div>
+      <h4 className="mt-3 text-base font-semibold" style={{ color: INK_TEXT }}>
+        {title}
+      </h4>
+      <p className="mt-1 text-sm leading-relaxed" style={{ color: MUTED }}>
+        {desc}
+      </p>
+    </div>
+  );
+}
+
+// Rotating gradient-ring core with the section's central message.
+function LearningCore() {
+  return (
+    <div className="relative flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
+      {/* ambient blurred glow */}
+      <div
+        className="core-pulse absolute inset-0 rounded-full blur-3xl"
+        style={{
+          background: `radial-gradient(circle, ${VIOLET} 0%, ${VIOLET_LINE} 55%, transparent 75%)`,
+          opacity: 0.22,
+        }}
       />
-      <div className="px-5 py-5 sm:px-6 sm:py-6">
+      {/* rotating ring */}
+      <div
+        className="core-spin absolute inset-0 rounded-full"
+        style={{
+          background: `conic-gradient(from 0deg, ${VIOLET_DEEP}, transparent 35%, ${VIOLET}, transparent 75%, ${VIOLET_DEEP})`,
+          padding: 2,
+        }}
+      >
+        <div className="h-full w-full rounded-full" style={{ backgroundColor: BG }} />
+      </div>
+      {/* static core content */}
+      <div
+        className="relative z-10 flex h-[85%] w-[85%] flex-col items-center justify-center rounded-full text-center px-6"
+        style={{
+          background: `radial-gradient(circle at 50% 35%, ${VIOLET_SOFT}, #FFFFFF)`,
+          border: "1px solid rgba(124,106,232,0.16)",
+          boxShadow: "0 10px 40px rgba(124,106,232,0.14)",
+        }}
+      >
         <p
-          className="text-lg font-semibold leading-snug sm:text-xl"
-          style={{ color: c.text }}
+          className="text-[10px] font-semibold uppercase tracking-[0.2em]"
+          style={{ color: VIOLET_DEEP }}
         >
-          {caption}
+          Creative Adhyayan
+        </p>
+        <p className="mt-2 text-lg font-bold leading-snug sm:text-xl" style={{ color: INK_TEXT }}>
+          Empowering India With Digital Skills.
         </p>
       </div>
     </div>
   );
 }
 
-function VideoCard({ heading, videoUrl, thumbnail, tone = "indigo" }) {
-  const c = PALETTE[tone];
+function CircuitLines() {
   return (
-    <div
-      style={{ ...cardRadius, backgroundColor: c.bg }}
-      className="flex flex-col p-5 shadow-sm sm:p-6"
+    <svg
+      viewBox="0 0 1200 720"
+      className="pointer-events-none absolute inset-0 h-full w-full"
+      preserveAspectRatio="none"
+      aria-hidden="true"
     >
-      <h3
-        className="text-xl font-bold leading-snug sm:text-2xl"
-        style={{ color: c.text }}
-      >
-        {heading}
-      </h3>
+      <defs>
+        <linearGradient id="lineGrad" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0%" stopColor={VIOLET} stopOpacity="0.55" />
+          <stop offset="100%" stopColor={VIOLET} stopOpacity="0.12" />
+        </linearGradient>
+      </defs>
+      {[
+        "M380 300 L440 300 L440 330 L470 330",
+        "M820 300 L760 300 L760 330 L730 330",
+        "M600 520 L600 490",
+      ].map((d, i) => (
+        <path
+          key={i}
+          d={d}
+          fill="none"
+          stroke="url(#lineGrad)"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className="circuit-dash"
+        />
+      ))}
+      {[
+        [380, 300],
+        [820, 300],
+        [600, 520],
+      ].map(([cx, cy], i) => (
+        <circle key={i} cx={cx} cy={cy} r="5" fill={VIOLET} />
+      ))}
+    </svg>
+  );
+}
 
+function SectionInner() {
+  const [students, practical, environment] = CARDS;
+  return (
+    <div className="relative w-full px-4 py-20 sm:px-8" style={{ backgroundColor: BG }}>
+      <style>{`
+        @keyframes core-spin-kf { to { transform: rotate(360deg); } }
+        @keyframes core-pulse-kf { 0%, 100% { opacity: .18; transform: scale(1); } 50% { opacity: .3; transform: scale(1.06); } }
+        @keyframes dash-flow-kf { to { stroke-dashoffset: -24; } }
+        .core-spin { animation: core-spin-kf 14s linear infinite; }
+        .core-pulse { animation: core-pulse-kf 5s ease-in-out infinite; }
+        .circuit-dash { stroke-dasharray: 6 6; animation: dash-flow-kf 1.6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .core-spin, .core-pulse, .circuit-dash { animation: none; }
+        }
+      `}</style>
+
+      {/* background grid texture */}
       <div
-        style={cardRadius}
-        className="relative mt-5 flex-1 overflow-hidden bg-[#2C2743]"
-      >
-        {videoUrl ? (
-          <iframe
-            src={videoUrl}
-            title={heading}
-            className="h-64 w-full sm:h-72"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-            allowFullScreen
-          />
-        ) : (
-          <>
-            {thumbnail && (
-              <img
-                src={thumbnail}
-                alt=""
-                className="h-64 w-full object-cover opacity-60 sm:h-72"
-              />
-            )}
-            <button
-              type="button"
-              aria-label="Play video"
-              style={{ backgroundColor: c.accent }}
-              className="absolute inset-0 m-auto flex h-16 w-16 items-center justify-center rounded-full text-white shadow-lg transition-transform hover:scale-105"
-            >
-              <Play size={22} className="ml-0.5 fill-white" />
-            </button>
-            <div className="absolute bottom-4 left-4 flex gap-3 text-white/80">
-              <Share2 size={18} />
-              <Clock size={18} />
-            </div>
-          </>
-        )}
+        className="pointer-events-none absolute inset-0 opacity-[0.5]"
+        style={{
+          backgroundImage:
+            "linear-gradient(rgba(124,106,232,0.05) 1px, transparent 1px), linear-gradient(90deg, rgba(124,106,232,0.05) 1px, transparent 1px)",
+          backgroundSize: "48px 48px",
+        }}
+      />
+
+      <div className="relative mx-auto max-w-6xl">
+        {/* desktop hub layout */}
+        <div className="relative hidden aspect-[1200/720] w-full lg:block">
+          <CircuitLines />
+          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
+            <LearningCore />
+          </div>
+          <div className="absolute" style={{ left: "3.3%", top: "27.7%" }}>
+            <SpokeCard card={students} />
+          </div>
+          <div className="absolute" style={{ right: "3.3%", top: "27.7%" }}>
+            <SpokeCard card={practical} align="right" />
+          </div>
+          <div
+            className="absolute"
+            style={{ left: "50%", top: "72.2%", transform: "translateX(-50%)" }}
+          >
+            <SpokeCard card={environment} />
+          </div>
+        </div>
+
+        {/* mobile / tablet stacked layout */}
+        <div className="flex flex-col items-center gap-8 lg:hidden">
+          <LearningCore />
+          <div className="flex w-full flex-col items-center gap-4">
+            {CARDS.map((c) => (
+              <SpokeCard key={c.id} card={c} />
+            ))}
+          </div>
+        </div>
       </div>
     </div>
   );
 }
 
 export default function LearningEnvironmentSection() {
-  return (
-    <section className="w-full bg-white px-4 py-16 sm:px-8">
-      <div className="mx-auto max-w-6xl">
-        <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-          <PhotoCard
-            tone="orange"
-            image={study}
-            caption="1000+ Students Trained in Digital Marketing and AI Excellence."
-          />
-          <PhotoCard
-            tone="indigo"
-            image={crew}
-            caption="100% Practical Training & Internship Opportunities"
-          />
-          <VideoCard
-            tone="orange"
-            heading="A Great Learning Environment Powered by Expert-Led Training & Modern Infrastructure."
-            videoUrl="" // e.g. "https://www.youtube.com/embed/VIDEO_ID"
-            thumbnail=""
-          />
-        </div>
+  const probeRef = useRef(null);
+  const [contentHeight, setContentHeight] = useState(0);
+  const [active, setActive] = useState(false);
 
-        {/* full-width banner */}
-        <div
-          style={{ ...cardRadius, backgroundColor: PALETTE.indigo.bg }}
-          className="mt-3 px-8 py-8 text-center shadow-sm sm:py-10"
-        >
-          <p
-            className="text-2xl font-bold sm:text-3xl"
-            style={{ color: PALETTE.indigo.text }}
-          >
-            Empowering India With Digital Skills.
-          </p>
-        </div>
+  useEffect(() => {
+    const probe = probeRef.current;
+    if (!probe) return;
+
+    const measure = () => setContentHeight(probe.scrollHeight);
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(probe);
+    return () => observer.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (contentHeight === 0) return;
+    const timer = setTimeout(() => setActive(true), 300);
+    return () => clearTimeout(timer);
+  }, [contentHeight]);
+
+  return (
+    <section className="relative w-full">
+      <div
+        ref={probeRef}
+        aria-hidden="true"
+        className="pointer-events-none invisible absolute left-0 top-0 w-full -z-10"
+      >
+        <SectionInner />
       </div>
+
+      {contentHeight > 0 && (
+        <PixelSwap
+          active={active}
+          firstContent={<div className="h-full w-full" style={{ backgroundColor: VIOLET_DEEP }} />}
+          secondContent={
+            <div className="h-full w-full">
+              <SectionInner />
+            </div>
+          }
+          pixelSize={32}
+          gap={0}
+          pixelRadius={0}
+          pixelSpin={0}
+          pixelScale={0.6}
+          duration={2200}
+          pixelDuration={1400}
+          pattern="wave"
+          randomness={0.08}
+          fade
+          aspectRatio="auto"
+          style={{ height: contentHeight }}
+        />
+      )}
     </section>
   );
 }
