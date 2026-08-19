@@ -21,12 +21,12 @@ import Certificates from './dashboard/Certificates.jsx'
 import Payments from './dashboard/Payments.jsx'
 import Profile from './dashboard/Profile.jsx'
 
-import AdminDashboard from './admin/AdminDashboard.jsx'
-import Students from './admin/Students.jsx'
-import AdminCourses from './admin/Courses.jsx'
-import Lessons from './admin/Lessons.jsx'
-import AdminPayments from './admin/Payments.jsx'
-import Analytics from './admin/Analytics.jsx'
+import AdminDashboard from './AdminDashBoards/AdminDashboard.jsx'
+import Students from './AdminDashBoards/Students.jsx'
+import AdminCourses from './AdminDashBoards/Courses.jsx'
+import Lessons from './AdminDashBoards/Lessons.jsx'
+import AdminPayments from './AdminDashBoards/Payments.jsx'
+import Analytics from './AdminDashBoards/Analytics.jsx'
 
 function App() {
   return (

@@ -427,329 +427,329 @@ export default function StudentLayout() {
             </button>
           </motion.div>
         )}
-        </AnimatePresence>
+      </AnimatePresence>
 
-        {/* ================= DESKTOP SIDEBAR ================= */}
-        <motion.aside
-          animate={{ width: collapsed ? 84 : 260 }}
-          transition={{ type: "spring", stiffness: 320, damping: 34 }}
-          className="sticky top-0 hidden h-screen shrink-0 lg:block"
-          style={{ background: SIDEBAR_BG }}
+      {/* ================= DESKTOP SIDEBAR ================= */}
+      <motion.aside
+        animate={{ width: collapsed ? 84 : 260 }}
+        transition={{ type: "spring", stiffness: 320, damping: 34 }}
+        className="sticky top-0 hidden h-screen shrink-0 lg:block"
+        style={{ background: SIDEBAR_BG }}
+      >
+        <SidebarContent
+          collapsed={collapsed}
+          user={user}
+          onLogout={handleLogout}
+          onNavigate={() => { }}
+        />
+
+        {/* collapse toggle */}
+        <button
+          type="button"
+          onClick={() => setCollapsed((c) => !c)}
+          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          aria-pressed={collapsed}
+          className="group absolute -right-4 top-11 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg transition-all hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
+          style={{ background: ACCENT, outlineColor: AMBER }}
         >
-          <SidebarContent
-            collapsed={collapsed}
-            user={user}
-            onLogout={handleLogout}
-            onNavigate={() => { }}
+          <ChevronsLeft
+            className={`h-5 w-5 text-white transition-transform duration-300 ${collapsed ? "rotate-180" : ""
+              }`}
+            strokeWidth={2.75}
           />
 
-          {/* collapse toggle */}
-          <button
-            type="button"
-            onClick={() => setCollapsed((c) => !c)}
-            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            aria-pressed={collapsed}
-            className="group absolute -right-4 top-11 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg transition-all hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-            style={{ background: ACCENT, outlineColor: AMBER }}
+          {/* tooltip */}
+          <span
+            className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+            style={{ background: "#1B0E3D" }}
           >
-            <ChevronsLeft
-              className={`h-5 w-5 text-white transition-transform duration-300 ${collapsed ? "rotate-180" : ""
-                }`}
-              strokeWidth={2.75}
+            {collapsed ? "Expand sidebar" : "Collapse sidebar"}
+          </span>
+        </button>
+      </motion.aside>
+
+      {/* ================= MOBILE DRAWER ================= */}
+      <AnimatePresence>
+        {mobileOpen && (
+          <>
+            <motion.div
+              key="scrim"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={closeMobileNav}
+              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              aria-hidden="true"
             />
-
-            {/* tooltip */}
-            <span
-              className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-              style={{ background: "#1B0E3D" }}
+            <motion.aside
+              key="drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Student navigation"
+              initial={{ x: "-100%" }}
+              animate={{ x: 0 }}
+              exit={{ x: "-100%" }}
+              transition={{ type: "spring", stiffness: 340, damping: 34 }}
+              className="fixed inset-y-0 left-0 z-50 w-[78%] max-w-[280px] lg:hidden"
+              style={{ background: SIDEBAR_BG }}
             >
-              {collapsed ? "Expand sidebar" : "Collapse sidebar"}
-            </span>
-          </button>
-        </motion.aside>
-
-        {/* ================= MOBILE DRAWER ================= */}
-        <AnimatePresence>
-          {mobileOpen && (
-            <>
-              <motion.div
-                key="scrim"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
+              <button
+                type="button"
                 onClick={closeMobileNav}
-                className="fixed inset-0 z-40 bg-black/40 lg:hidden"
-                aria-hidden="true"
-              />
-              <motion.aside
-                key="drawer"
-                role="dialog"
-                aria-modal="true"
-                aria-label="Student navigation"
-                initial={{ x: "-100%" }}
-                animate={{ x: 0 }}
-                exit={{ x: "-100%" }}
-                transition={{ type: "spring", stiffness: 340, damping: 34 }}
-                className="fixed inset-y-0 left-0 z-50 w-[78%] max-w-[280px] lg:hidden"
-                style={{ background: SIDEBAR_BG }}
+                aria-label="Close menu"
+                className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:text-white"
               >
+                <X className="h-4 w-4" />
+              </button>
+              <SidebarContent
+                collapsed={false}
+                user={user}
+                onLogout={handleLogout}
+                onNavigate={closeMobileNav}
+                firstLinkRef={drawerFirstLinkRef}
+              />
+            </motion.aside>
+          </>
+        )}
+      </AnimatePresence>
+
+      {/* ================= MAIN COLUMN ================= */}
+      <div className="flex min-h-screen flex-1 flex-col">
+        {/* topbar */}
+        <header
+          className="sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3.5 backdrop-blur sm:px-6"
+          style={{ background: "rgba(236,238,243,0.85)", borderColor: DARK }}
+        >
+          <button
+            ref={mobileMenuBtnRef}
+            type="button"
+            onClick={() => setMobileOpen(true)}
+            aria-label="Open menu"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] lg:hidden"
+            style={{ background: LIGHT }}
+          >
+            <Menu className="h-4 w-4" />
+          </button>
+
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-[#8A82A6]">
+              {location.pathname === "/dashboard" ? "Overview" : "Student Dashboard"}
+            </p>
+            <h1 className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl">
+              {location.pathname === "/dashboard" ? `${greeting}, ${firstName}` : pageTitle}
+            </h1>
+          </div>
+
+          {/* search — desktop only */}
+          <div ref={searchWrapRef} className="relative hidden w-64 shrink-0 md:block">
+            <label className="relative flex items-center">
+              <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#A79BC4]" />
+              <input
+                ref={searchRef}
+                type="search"
+                role="combobox"
+                aria-expanded={searchOpen}
+                aria-controls="student-search-listbox"
+                aria-autocomplete="list"
+                value={searchValue}
+                onChange={(e) => {
+                  setSearchValue(e.target.value);
+                  setSearchOpen(true);
+                }}
+                onFocus={() => setSearchOpen(true)}
+                onKeyDown={handleSearchKeyDown}
+                placeholder="Search courses, lessons…"
+                aria-label="Search courses and lessons"
+                className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none ring-1 ring-transparent transition focus:ring-2"
+                style={{ "--tw-ring-color": ACCENT }}
+              />
+              {!searchValue && (
+                <kbd className="pointer-events-none absolute right-3.5 rounded-md border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#8A82A6]">
+                  ⌘K
+                </kbd>
+              )}
+              {searchValue && (
                 <button
                   type="button"
-                  onClick={closeMobileNav}
-                  aria-label="Close menu"
-                  className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:text-white"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-                <SidebarContent
-                  collapsed={false}
-                  user={user}
-                  onLogout={handleLogout}
-                  onNavigate={closeMobileNav}
-                  firstLinkRef={drawerFirstLinkRef}
-                />
-              </motion.aside>
-            </>
-          )}
-        </AnimatePresence>
-
-        {/* ================= MAIN COLUMN ================= */}
-        <div className="flex min-h-screen flex-1 flex-col">
-          {/* topbar */}
-          <header
-            className="sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3.5 backdrop-blur sm:px-6"
-            style={{ background: "rgba(236,238,243,0.85)", borderColor: DARK }}
-          >
-            <button
-              ref={mobileMenuBtnRef}
-              type="button"
-              onClick={() => setMobileOpen(true)}
-              aria-label="Open menu"
-              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] lg:hidden"
-              style={{ background: LIGHT }}
-            >
-              <Menu className="h-4 w-4" />
-            </button>
-
-            <div className="min-w-0 flex-1">
-              <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-[#8A82A6]">
-                {location.pathname === "/dashboard" ? "Overview" : "Student Dashboard"}
-              </p>
-              <h1 className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl">
-                {location.pathname === "/dashboard" ? `${greeting}, ${firstName}` : pageTitle}
-              </h1>
-            </div>
-
-            {/* search — desktop only */}
-            <div ref={searchWrapRef} className="relative hidden w-64 shrink-0 md:block">
-              <label className="relative flex items-center">
-                <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#A79BC4]" />
-                <input
-                  ref={searchRef}
-                  type="search"
-                  role="combobox"
-                  aria-expanded={searchOpen}
-                  aria-controls="student-search-listbox"
-                  aria-autocomplete="list"
-                  value={searchValue}
-                  onChange={(e) => {
-                    setSearchValue(e.target.value);
-                    setSearchOpen(true);
+                  onClick={() => {
+                    setSearchValue("");
+                    searchRef.current?.focus();
                   }}
-                  onFocus={() => setSearchOpen(true)}
-                  onKeyDown={handleSearchKeyDown}
-                  placeholder="Search courses, lessons…"
-                  aria-label="Search courses and lessons"
-                  className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none ring-1 ring-transparent transition focus:ring-2"
-                  style={{ "--tw-ring-color": ACCENT }}
-                />
-                {!searchValue && (
-                  <kbd className="pointer-events-none absolute right-3.5 rounded-md border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#8A82A6]">
-                    ⌘K
-                  </kbd>
-                )}
-                {searchValue && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchValue("");
-                      searchRef.current?.focus();
-                    }}
-                    aria-label="Clear search"
-                    className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full text-[#A79BC4] hover:text-[#1B0E3D]"
-                  >
-                    <X className="h-3.5 w-3.5" />
-                  </button>
-                )}
-              </label>
+                  aria-label="Clear search"
+                  className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full text-[#A79BC4] hover:text-[#1B0E3D]"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </label>
 
-              <AnimatePresence>
-                {searchOpen && (
-                  <motion.ul
-                    id="student-search-listbox"
-                    role="listbox"
-                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
-                  >
-                    {searchResults.length === 0 ? (
-                      <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">
-                        No matches for “{searchValue}”
-                      </li>
-                    ) : (
-                      searchResults.map((item, idx) => (
-                        <li key={item.to} role="option" aria-selected={idx === activeResultIndex}>
-                          <button
-                            type="button"
-                            onMouseEnter={() => setActiveResultIndex(idx)}
-                            onClick={() => selectSearchResult(item)}
-                            className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${idx === activeResultIndex
-                                ? "bg-violet-50 text-[#1B0E3D]"
-                                : "text-[#4A3D66] hover:bg-violet-50"
-                              }`}
-                          >
-                            <item.icon className="h-4 w-4 shrink-0 text-[#8A82A6]" />
-                            {item.label}
-                          </button>
-                        </li>
-                      ))
-                    )}
-                  </motion.ul>
-                )}
-              </AnimatePresence>
-            </div>
-
-            {/* notifications */}
-            <div ref={notifRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setNotifOpen((o) => !o)}
-                aria-label="Notifications"
-                aria-expanded={notifOpen}
-                aria-haspopup="menu"
-                className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] transition-transform hover:scale-105"
-                style={{ background: LIGHT }}
-              >
-                <Bell className="h-4 w-4" />
-                {unreadCount > 0 && (
-                  <span
-                    className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
-                    style={{ background: AMBER }}
-                  />
-                )}
-              </button>
-
-              <AnimatePresence>
-                {notifOpen && (
-                  <motion.div
-                    role="menu"
-                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
-                  >
-                    <div className="flex items-center justify-between px-3 py-2">
-                      <p className="text-sm font-semibold text-[#1B0E3D]">Notifications</p>
-                      {unreadCount > 0 && (
+            <AnimatePresence>
+              {searchOpen && (
+                <motion.ul
+                  id="student-search-listbox"
+                  role="listbox"
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                >
+                  {searchResults.length === 0 ? (
+                    <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">
+                      No matches for “{searchValue}”
+                    </li>
+                  ) : (
+                    searchResults.map((item, idx) => (
+                      <li key={item.to} role="option" aria-selected={idx === activeResultIndex}>
                         <button
                           type="button"
-                          onClick={markAllNotificationsRead}
-                          className="text-xs font-semibold text-[#5227FF] hover:underline"
+                          onMouseEnter={() => setActiveResultIndex(idx)}
+                          onClick={() => selectSearchResult(item)}
+                          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${idx === activeResultIndex
+                            ? "bg-violet-50 text-[#1B0E3D]"
+                            : "text-[#4A3D66] hover:bg-violet-50"
+                            }`}
                         >
-                          Mark all read
+                          <item.icon className="h-4 w-4 shrink-0 text-[#8A82A6]" />
+                          {item.label}
                         </button>
-                      )}
-                    </div>
-                    <div className="my-1 h-px bg-violet-100" />
-                    {notifications.length === 0 ? (
-                      <p className="px-3 py-6 text-center text-sm text-[#8A82A6]">
-                        You're all caught up.
-                      </p>
-                    ) : (
-                      <ul className="max-h-72 overflow-y-auto">
-                        {notifications.map((n) => (
-                          <li key={n.id}>
-                            <div
-                              className={`rounded-xl px-3 py-2.5 text-sm ${n.read ? "text-[#8A82A6]" : "bg-violet-50/60 text-[#1B0E3D]"
-                                }`}
-                            >
-                              <p className="font-medium">{n.title}</p>
-                              {n.body && <p className="mt-0.5 text-xs text-[#8A82A6]">{n.body}</p>}
-                            </div>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
+                      </li>
+                    ))
+                  )}
+                </motion.ul>
+              )}
+            </AnimatePresence>
+          </div>
 
-            {/* account menu */}
-            <div ref={accountRef} className="relative shrink-0">
-              <button
-                type="button"
-                onClick={() => setAccountOpen((o) => !o)}
-                aria-expanded={accountOpen}
-                aria-haspopup="menu"
-                className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white"
-              >
-                <Avatar user={user} size={28} />
-                <ChevronDown
-                  className={`hidden h-3.5 w-3.5 text-[#1B0E3D] transition-transform sm:block ${accountOpen ? "rotate-180" : ""
-                    }`}
+          {/* notifications */}
+          <div ref={notifRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setNotifOpen((o) => !o)}
+              aria-label="Notifications"
+              aria-expanded={notifOpen}
+              aria-haspopup="menu"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] transition-transform hover:scale-105"
+              style={{ background: LIGHT }}
+            >
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span
+                  className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
+                  style={{ background: AMBER }}
                 />
-              </button>
+              )}
+            </button>
 
-              <AnimatePresence>
-                {accountOpen && (
-                  <motion.div
-                    role="menu"
-                    initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                    animate={{ opacity: 1, y: 0, scale: 1 }}
-                    exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                    transition={{ duration: 0.15 }}
-                    className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+            <AnimatePresence>
+              {notifOpen && (
+                <motion.div
+                  role="menu"
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                >
+                  <div className="flex items-center justify-between px-3 py-2">
+                    <p className="text-sm font-semibold text-[#1B0E3D]">Notifications</p>
+                    {unreadCount > 0 && (
+                      <button
+                        type="button"
+                        onClick={markAllNotificationsRead}
+                        className="text-xs font-semibold text-[#5227FF] hover:underline"
+                      >
+                        Mark all read
+                      </button>
+                    )}
+                  </div>
+                  <div className="my-1 h-px bg-violet-100" />
+                  {notifications.length === 0 ? (
+                    <p className="px-3 py-6 text-center text-sm text-[#8A82A6]">
+                      You're all caught up.
+                    </p>
+                  ) : (
+                    <ul className="max-h-72 overflow-y-auto">
+                      {notifications.map((n) => (
+                        <li key={n.id}>
+                          <div
+                            className={`rounded-xl px-3 py-2.5 text-sm ${n.read ? "text-[#8A82A6]" : "bg-violet-50/60 text-[#1B0E3D]"
+                              }`}
+                          >
+                            <p className="font-medium">{n.title}</p>
+                            {n.body && <p className="mt-0.5 text-xs text-[#8A82A6]">{n.body}</p>}
+                          </div>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* account menu */}
+          <div ref={accountRef} className="relative shrink-0">
+            <button
+              type="button"
+              onClick={() => setAccountOpen((o) => !o)}
+              aria-expanded={accountOpen}
+              aria-haspopup="menu"
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white"
+            >
+              <Avatar user={user} size={28} />
+              <ChevronDown
+                className={`hidden h-3.5 w-3.5 text-[#1B0E3D] transition-transform sm:block ${accountOpen ? "rotate-180" : ""
+                  }`}
+              />
+            </button>
+
+            <AnimatePresence>
+              {accountOpen && (
+                <motion.div
+                  role="menu"
+                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                >
+                  <div className="px-3 py-2">
+                    <p className="truncate text-sm font-semibold text-[#1B0E3D]">
+                      {user?.displayName || "Student"}
+                    </p>
+                    <p className="truncate text-xs text-[#8A82A6]">{user?.email || ""}</p>
+                  </div>
+                  <div className="my-1 h-px bg-violet-100" />
+                  <NavLink
+                    to="/dashboard/profile"
+                    role="menuitem"
+                    onClick={() => setAccountOpen(false)}
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-[#4A3D66] hover:bg-violet-50"
                   >
-                    <div className="px-3 py-2">
-                      <p className="truncate text-sm font-semibold text-[#1B0E3D]">
-                        {user?.displayName || "Student"}
-                      </p>
-                      <p className="truncate text-xs text-[#8A82A6]">{user?.email || ""}</p>
-                    </div>
-                    <div className="my-1 h-px bg-violet-100" />
-                    <NavLink
-                      to="/dashboard/profile"
-                      role="menuitem"
-                      onClick={() => setAccountOpen(false)}
-                      className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-[#4A3D66] hover:bg-violet-50"
-                    >
-                      <Settings className="h-4 w-4" />
-                      Account settings
-                    </NavLink>
-                    <button
-                      type="button"
-                      role="menuitem"
-                      onClick={handleLogout}
-                      className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      Log out
-                    </button>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-            </div>
-          </header>
+                    <Settings className="h-4 w-4" />
+                    Account settings
+                  </NavLink>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={handleLogout}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                  >
+                    <LogOut className="h-4 w-4" />
+                    Log out
+                  </button>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        </header>
 
-          {/* routed page content */}
-          <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-            <Outlet />
-          </main>
-        </div>
+        {/* routed page content */}
+        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
+          <Outlet />
+        </main>
+      </div>
     </div>
   );
 }

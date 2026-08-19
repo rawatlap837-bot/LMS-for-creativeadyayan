@@ -1,12 +1,15 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
-import { auth } from "../data/Firebase";
+import { auth, db } from "../data/Firebase"; // make sure Firebase.js exports `db` (getFirestore(app))
+import { doc, getDoc } from "firebase/firestore";
 import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
@@ -27,8 +30,20 @@ import {
  * (#6D3FC0) + amber (#E8A33D). Split-screen layout: dark brand panel on the
  * left (desktop), clean white form card on the right.
  *
- * On a successful sign-in (email/password or Google), the person is sent
- * straight to /dashboard, which is StudentLayout's index route.
+ * ROLE-BASED ROUTING
+ * ───────────────────
+ * This is still one login form for everyone — students and admins use the
+ * same email/password (or Google) sign-in. After Firebase confirms who the
+ * person IS, we separately look up WHAT they are allowed to do:
+ *
+ *   users/{uid}  →  { role: "admin" | "student", ... }
+ *
+ * That Firestore document is the source of truth. A student is sent to
+ * /dashboard; an admin is sent to /admin/dashboard. If the role lookup
+ * fails or the field is missing, we fail SAFE and send them to /dashboard —
+ * never assume admin. Firestore security rules must forbid a client from
+ * writing their own `role` field (see note at the bottom of this file);
+ * otherwise this check is decorative, not real access control.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -45,6 +60,15 @@ function DotGrid({ className = "", dot = "fill-white/25" }) {
 
 const CUBE_GRID_SIZE = 8;
 
+function shouldUseRedirect() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isMobileUA = /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
+  const isInAppBrowser = /FBAN|FBAV|Instagram|Line\//i.test(ua);
+  const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
+  return isMobileUA || isInAppBrowser || isNarrowViewport;
+}
+
 function firebaseAuthErrorMessage(error) {
   switch (error?.code) {
     case "auth/invalid-email":
@@ -60,6 +84,8 @@ function firebaseAuthErrorMessage(error) {
     case "auth/popup-closed-by-user":
     case "auth/cancelled-popup-request":
       return "";
+    case "auth/popup-blocked":
+      return "Your browser blocked the sign-in popup. Please try again.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
     default:
@@ -71,6 +97,19 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
+// Looks up the signed-in user's role and returns the route they should
+// land on. Fails safe: any missing doc, missing field, or read error
+// resolves to the student dashboard, never the admin one.
+async function resolvePostLoginRoute(user) {
+  try {
+    const snap = await getDoc(doc(db, "users", user.uid));
+    const role = snap.exists() ? snap.data()?.role : null;
+    return role === "admin" ? "/admin" : "/dashboard";
+  } catch {
+    return "/dashboard";
+  }
+}
+
 export default function LoginForm() {
   const [form, setForm] = useState({ email: "", password: "" });
   const [showPassword, setShowPassword] = useState(false);
@@ -80,6 +119,33 @@ export default function LoginForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const cubesRef = useRef(null);
   const navigate = useNavigate();
+
+  // Pick up the result after returning from Google's redirect flow (mobile
+  // path). On desktop this simply resolves to null and does nothing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!cancelled && result?.user) {
+          const dest = await resolvePostLoginRoute(result.user);
+          navigate(dest);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = firebaseAuthErrorMessage(err);
+          if (message) {
+            setStatus("error");
+            setErrorMsg(message);
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const pulseCubesFor = (fieldName, value) => {
     const col = Math.min(
@@ -117,9 +183,10 @@ export default function LoginForm() {
         auth,
         remember ? browserLocalPersistence : browserSessionPersistence
       );
-      await signInWithEmailAndPassword(auth, form.email, form.password);
+      const { user } = await signInWithEmailAndPassword(auth, form.email, form.password);
+      const dest = await resolvePostLoginRoute(user);
       setStatus("idle");
-      navigate("/dashboard");
+      navigate(dest);
     } catch (err) {
       setStatus("error");
       setErrorMsg(firebaseAuthErrorMessage(err));
@@ -130,13 +197,26 @@ export default function LoginForm() {
     scrollToTop();
     setErrorMsg("");
     setGoogleLoading(true);
+
+    const provider = new GoogleAuthProvider();
+    const useRedirect = shouldUseRedirect();
+
     try {
       await setPersistence(
         auth,
         remember ? browserLocalPersistence : browserSessionPersistence
       );
-      await signInWithPopup(auth, new GoogleAuthProvider());
-      navigate("/dashboard");
+
+      if (useRedirect) {
+        // Navigates away from the page — no further code here runs until
+        // the effect above picks up getRedirectResult() when we come back.
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      const { user } = await signInWithPopup(auth, provider);
+      const dest = await resolvePostLoginRoute(user);
+      navigate(dest);
     } catch (err) {
       const message = firebaseAuthErrorMessage(err);
       if (message) {
@@ -144,6 +224,8 @@ export default function LoginForm() {
         setErrorMsg(message);
       }
     } finally {
+      // On the redirect path the page is already navigating away, so this
+      // only matters for the popup path (desktop).
       setGoogleLoading(false);
     }
   };
@@ -362,3 +444,24 @@ export default function LoginForm() {
     </div>
   );
 }
+
+/*
+ * SETTING SOMEONE UP AS ADMIN
+ * ────────────────────────────
+ * 1. In Firestore, the doc at users/{their-uid} needs { role: "admin" }.
+ *    Do this from the Firebase console or a trusted backend script —
+ *    NEVER expose an endpoint that lets a logged-in client set their own
+ *    role field.
+ * 2. Lock it down with a security rule so clients can read their own role
+ *    but only an admin (or your backend) can write it, e.g.:
+ *
+ *      match /users/{userId} {
+ *        allow read: if request.auth.uid == userId;
+ *        allow write: if request.auth.uid == userId
+ *                     && request.resource.data.role == resource.data.role;
+ *      }
+ *
+ * 3. Route guard: wrap AdminLayout in a RequireAdmin component (see
+ *    RequireAdmin.jsx) so someone can't just type /admin/dashboard into
+ *    the URL bar and get in without the role check.
+ */
