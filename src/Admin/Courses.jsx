@@ -10,7 +10,7 @@ import {
 } from "./AdminUI";
 import {
     ICON_KEYS, iconForCategory, estimateLessons, DEFAULT_PRICE, DEFAULT_INSTRUCTOR,
-} from "../lib/coursesmeta";
+} from "../lib/CoursesMeta.js";
 
 /* ------------------------------------------------------------------ */
 /*  Firestore collection name — SAME collection holds BOTH short and   */
