@@ -12,7 +12,6 @@ export default defineConfig({
       gzipSize: true,
     }),
   ],
-
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
@@ -23,9 +22,10 @@ export default defineConfig({
     rollupOptions: {
       output: {
         manualChunks: {
-          react: ["react", "react-dom"],
-        },
-      },
-    },
-  },
+          vendor: ['react', 'react-dom'],
+          html2canvas: ['html2canvas'],
+        }
+      }
+    }
+  }
 });

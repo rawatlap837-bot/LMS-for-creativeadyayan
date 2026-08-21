@@ -12,6 +12,10 @@ import {
   Code2,
   PenTool,
   Camera,
+  Megaphone,
+  Cpu,
+  Calculator,
+  Globe,
   X,
   Lock,
   ShoppingCart,
@@ -23,29 +27,60 @@ import {
   collection,
   doc,
   onSnapshot,
+  query,
+  where,
   setDoc,
   serverTimestamp,
 } from "firebase/firestore";
+import {
+  iconForCategory,
+  estimateLessons,
+  DEFAULT_PRICE,
+  DEFAULT_INSTRUCTOR,
+} from "../lib/coursesmeta";
 
 /**
  * MyCourses — Creative Adhyayan (live Firestore version, mobile-first)
  *
- * DATA MODEL — unchanged from the previous version:
- *   courses (collection): title, instructor, category, icon, color,
- *     lessons, duration, price
+ * DATA MODEL — matches the admin Courses panel (src/Admin/Courses.jsx):
+ *   courses (collection): type ("long" | "short"), title, category,
+ *     instructor, icon, color, lessons, duration, price, status
+ *     ("draft" | "published")
  *   users/{uid}/enrollments (subcollection): saved, purchased,
  *     lessonsDone, progress, status, updatedAt
+ *
+ * Only status === "published" courses reach students — enforced both by
+ * the query below AND by Firestore rules, so a draft course an admin is
+ * still editing never leaks into a student's course list.
+ *
+ * Long and short courses render identically here — buy, unlock, track
+ * progress — the only visual difference is the small type badge on each
+ * card, which just reflects the underlying catalog item.
  */
 
 const ACCENT = "#5227FF";
-const AMBER = "#E8A33D";
 const DARK = "#1B0E3D";
 const MUTED = "#8A82A6";
 const CANVAS = "#ECEEF3";
 
 const FILTERS = ["All", "In progress", "Completed", "Saved"];
 
-const ICONS = { Palette, Code2, PenTool, Camera, BookOpen };
+const ICONS = { Palette, Code2, PenTool, Camera, BookOpen, Megaphone, Cpu, Calculator, Globe };
+
+function TypeBadge({ type }) {
+  const isLong = type === "long";
+  return (
+    <span
+      className="rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+      style={{
+        background: isLong ? "#EDE7FB" : "#FDF1DE",
+        color: isLong ? "#5227FF" : "#B4790F",
+      }}
+    >
+      {isLong ? "Long" : "Short"}
+    </span>
+  );
+}
 
 function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
   const Icon = ICONS[course.icon] || BookOpen;
@@ -107,9 +142,12 @@ function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
       {/* body */}
       <div className="flex flex-1 flex-col gap-2.5 p-3.5 sm:gap-3 sm:p-4">
         <div className="min-w-0">
-          <p className="mb-1 truncate text-[10px] font-bold uppercase tracking-wide sm:text-[11px]" style={{ color: course.color }}>
-            {course.category}
-          </p>
+          <div className="mb-1 flex items-center gap-1.5">
+            <p className="truncate text-[10px] font-bold uppercase tracking-wide sm:text-[11px]" style={{ color: course.color }}>
+              {course.category}
+            </p>
+            <TypeBadge type={course.type} />
+          </div>
           <h3 className="text-sm font-bold leading-snug sm:text-[15px]" style={{ color: DARK }}>
             {course.title}
           </h3>
@@ -222,8 +260,8 @@ function CourseModal({ course, onClose, onAdvance }) {
             {isDone
               ? `You've completed all ${course.lessons} lessons. Review any lesson to brush up.`
               : course.progress === 0
-              ? `Ready to start — ${course.lessons} lessons, ${course.duration} total.`
-              : `Lesson ${course.lessonsDone + 1} of ${course.lessons} is next.`}
+                ? `Ready to start — ${course.lessons} lessons, ${course.duration} total.`
+                : `Lesson ${course.lessonsDone + 1} of ${course.lessons} is next.`}
           </p>
 
           <div className="h-1.5 w-full overflow-hidden rounded-full" style={{ background: CANVAS }}>
@@ -362,7 +400,7 @@ export default function MyCourses() {
   const [loading, setLoading] = useState(true);
 
   const [activeFilter, setActiveFilter] = useState("All");
-  const [query, setQuery] = useState("");
+  const [query_, setQuery] = useState("");
   const [openCourseId, setOpenCourseId] = useState(null);
   const [buyCourseId, setBuyCourseId] = useState(null);
   const [purchaseStatus, setPurchaseStatus] = useState("idle");
@@ -372,8 +410,13 @@ export default function MyCourses() {
     return unsub;
   }, []);
 
+  // Only status === "published" courses reach students — Firestore rules
+  // enforce this too (a draft-only or unfiltered query from a non-admin
+  // is rejected outright), so this filter is belt-and-suspenders, not the
+  // only line of defense.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "courses"), (snap) => {
+    const publishedCourses = query(collection(db, "courses"), where("status", "==", "published"));
+    const unsub = onSnapshot(publishedCourses, (snap) => {
       setRawCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
     });
     return unsub;
@@ -399,6 +442,13 @@ export default function MyCourses() {
       const e = enrollments[c.id] || {};
       return {
         ...c,
+        // Fallbacks for courses added before icon/price/lessons/instructor
+        // existed on every doc — keeps older data from rendering blank.
+        icon: c.icon || iconForCategory(c.category),
+        price: c.price || DEFAULT_PRICE,
+        lessons: c.lessons || estimateLessons(c.duration || ""),
+        instructor: c.instructor || DEFAULT_INSTRUCTOR,
+        color: c.color || "#5227FF",
         saved: !!e.saved,
         purchased: !!e.purchased,
         lessonsDone: e.lessonsDone || 0,
@@ -413,10 +463,10 @@ export default function MyCourses() {
       const matchesFilter =
         activeFilter === "All" ||
         (activeFilter === "Saved" ? c.saved : c.status === activeFilter);
-      const matchesQuery = c.title.toLowerCase().includes(query.trim().toLowerCase());
+      const matchesQuery = c.title.toLowerCase().includes(query_.trim().toLowerCase());
       return matchesFilter && matchesQuery;
     });
-  }, [courses, activeFilter, query]);
+  }, [courses, activeFilter, query_]);
 
   const openCourse = (course) => setOpenCourseId(course.id);
   const closeModal = () => setOpenCourseId(null);
@@ -459,6 +509,9 @@ export default function MyCourses() {
     setPurchaseStatus("processing");
 
     // TODO: replace with your real payment/checkout call (Razorpay, etc).
+    // TODO: once Razorpay is wired, this write should move server-side —
+    // a Cloud Function verifying the payment signature before flipping
+    // `purchased` to true. See firestore.rules for the matching note.
     await new Promise((res) => setTimeout(res, 1200));
 
     await setDoc(
@@ -515,7 +568,7 @@ export default function MyCourses() {
             <Search className="pointer-events-none absolute left-3.5 h-4 w-4 shrink-0" style={{ color: "#A79BC4" }} />
             <input
               type="search"
-              value={query}
+              value={query_}
               onChange={(e) => setQuery(e.target.value)}
               placeholder="Search your courses…"
               className="w-full min-w-0 rounded-full border-0 bg-white py-2.5 pl-10 pr-4 text-sm outline-none ring-1 ring-transparent transition focus:ring-2"
@@ -577,7 +630,7 @@ export default function MyCourses() {
             </p>
             <p className="text-xs" style={{ color: MUTED }}>
               {rawCourses.length === 0
-                ? "Add a course document to the 'courses' collection in Firestore."
+                ? "Ask an admin to publish a course from the Admin panel."
                 : "Try a different filter or search term."}
             </p>
           </div>

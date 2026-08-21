@@ -12,7 +12,7 @@ import {
   FileText,
   RefreshCcw,
 } from "lucide-react";
-import { auth, db, storage } from "../data/firebase";
+import { auth, db, storage } from "../firebase/Firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import {
   collection,

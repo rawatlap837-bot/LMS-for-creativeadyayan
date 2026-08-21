@@ -64,6 +64,7 @@ export default {
         mono: ["Pochaevsk", "monospace"],
         pliant: ["Pliant", "sans-serif"],
         sans: ["Geist Variable", "sans-serif"],
+        telma: ["Telma", "sans-serif"], // 👈 add this
       },
       keyframes: {
         "shiny-text": {

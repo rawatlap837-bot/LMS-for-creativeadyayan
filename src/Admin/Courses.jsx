@@ -8,12 +8,15 @@ import { COURSES_BY_CATEGORY as LONG_COURSES_BY_CATEGORY } from "../data/Sitedat
 import {
     AT, Pill, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal,
 } from "./adminUI.jsx";
+import {
+    ICON_KEYS, iconForCategory, estimateLessons, DEFAULT_PRICE, DEFAULT_INSTRUCTOR,
+} from "../lib/coursesmeta";
 
 /* ------------------------------------------------------------------ */
 /*  Firestore collection name — SAME collection holds BOTH short and   */
 /*  long courses, distinguished by the `type` field ("long" | "short").*/
-/*  Public pages (LiveCourses.jsx / ShortCourses.jsx) read from here   */
-/*  too, filtered by type + status === "published".                    */
+/*  Public pages (LiveCourses.jsx / ShortCourses.jsx / MyCourses.jsx)  */
+/*  read from here too, filtered by type + status === "published".     */
 /* ------------------------------------------------------------------ */
 const COURSES_COLLECTION = "courses";
 
@@ -26,6 +29,10 @@ const COURSES_COLLECTION = "courses";
 /*  they were already live) so they simply appear — no button, no      */
 /*  separate script. It only ever runs while the collection is empty,  */
 /*  so it can't create duplicates on later visits.                     */
+/*                                                                      */
+/*  Both types now get icon/price/lessons/instructor defaults so       */
+/*  MyCourses.jsx (buy + progress tracking) works identically for      */
+/*  long and short courses right out of the import.                    */
 /* ------------------------------------------------------------------ */
 const SHORT_COURSE_GROUPS = [
     {
@@ -89,6 +96,11 @@ async function importLegacyCourses() {
                 images: course.image ? [course.image] : [],
                 tags: course.tags || [],
                 features: course.features || [],
+                instructor: DEFAULT_INSTRUCTOR,
+                icon: iconForCategory(category),
+                color: "#5227FF",
+                lessons: estimateLessons(course.duration || ""),
+                price: DEFAULT_PRICE,
                 students: 0,
                 status: "published",
                 createdAt: serverTimestamp(),
@@ -108,6 +120,10 @@ async function importLegacyCourses() {
                 color: course.color || "#6D3FC0",
                 popular: !!course.popular,
                 tags: [],
+                instructor: DEFAULT_INSTRUCTOR,
+                icon: iconForCategory(group.label),
+                lessons: estimateLessons(course.duration || ""),
+                price: DEFAULT_PRICE,
                 students: 0,
                 status: "published",
                 createdAt: serverTimestamp(),
@@ -203,6 +219,25 @@ function ColorField({ label, value, onChange }) {
                     style={{ borderColor: AT.line, color: AT.ink }}
                 />
             </div>
+        </div>
+    );
+}
+
+function SelectField({ label, value, onChange, options, hint }) {
+    return (
+        <div className="mb-3">
+            <label className="block text-xs font-medium mb-1" style={{ color: AT.sub }}>{label}</label>
+            <select
+                value={value}
+                onChange={onChange}
+                className="w-full text-sm rounded-lg border px-3 py-2 outline-none"
+                style={{ borderColor: AT.line, color: AT.ink }}
+            >
+                {options.map((o) => (
+                    <option key={o} value={o}>{o}</option>
+                ))}
+            </select>
+            {hint && <p className="text-[11px] mt-1" style={{ color: AT.sub }}>{hint}</p>}
         </div>
     );
 }
@@ -341,17 +376,23 @@ export default function Courses() {
                 description: form.description || "",
                 duration: form.duration || "",
                 tags: splitCommas(form.tagsInput),
+                // shared across both types now — buy + progress works the
+                // same way regardless of long/short.
+                instructor: form.instructor || DEFAULT_INSTRUCTOR,
+                icon: form.icon || iconForCategory(form.category),
+                price: form.price || DEFAULT_PRICE,
+                lessons: form.lessons ? Number(form.lessons) : estimateLessons(form.duration || ""),
             };
 
             const payload =
                 form.type === "long"
                     ? {
                         ...base,
-                        instructor: form.instructor || "",
                         mode: form.mode || "",
                         link: form.link || "",
                         images: splitLines(form.imagesInput),
                         features: splitLines(form.featuresInput),
+                        color: form.color || "#5227FF",
                     }
                     : {
                         ...base,
@@ -442,6 +483,7 @@ export default function Courses() {
                             <th className="px-4 py-3 font-medium">Course</th>
                             <th className="px-4 py-3 font-medium">Type</th>
                             <th className="px-4 py-3 font-medium">Category</th>
+                            <th className="px-4 py-3 font-medium">Price</th>
                             <th className="px-4 py-3 font-medium">Enrolled</th>
                             <th className="px-4 py-3 font-medium">Status</th>
                             <th className="px-4 py-3 font-medium text-right">Actions</th>
@@ -450,7 +492,7 @@ export default function Courses() {
                     <tbody>
                         {loading || seeding ? (
                             <tr>
-                                <td colSpan={6} className="px-4 py-6 text-center text-sm" style={{ color: AT.sub }}>
+                                <td colSpan={7} className="px-4 py-6 text-center text-sm" style={{ color: AT.sub }}>
                                     {seeding ? "Importing your existing courses…" : "Loading courses…"}
                                 </td>
                             </tr>
@@ -465,11 +507,12 @@ export default function Courses() {
                                     <td className="px-4 py-3">
                                         <p className="font-medium" style={{ color: AT.ink }}>{c.title}</p>
                                         <p className="text-xs" style={{ color: AT.sub }}>
-                                            {c.type === "long" ? (c.instructor || "No instructor set") : (c.duration || "—")}
+                                            {c.instructor || "No instructor set"}
                                         </p>
                                     </td>
                                     <td className="px-4 py-3"><TypeBadge type={c.type} /></td>
                                     <td className="px-4 py-3" style={{ color: AT.ink }}>{c.category || "—"}</td>
+                                    <td className="px-4 py-3" style={{ color: AT.ink }}>{c.price || "—"}</td>
                                     <td className="px-4 py-3" style={{ color: AT.ink }}>{c.students ?? 0}</td>
                                     <td className="px-4 py-3">
                                         <button onClick={(e) => { e.stopPropagation(); toggleStatus(c); }}>
@@ -540,6 +583,10 @@ function CourseForm({ initial, saving, categorySuggestions, onCancel, onSave }) 
                 tagsInput: (initial.tags || []).join(", "),
                 featuresInput: (initial.features || []).join("\n"),
                 imagesInput: (initial.images || []).join("\n"),
+                lessons: initial.lessons ?? estimateLessons(initial.duration || ""),
+                price: initial.price || "",
+                icon: initial.icon || iconForCategory(initial.category),
+                instructor: initial.instructor || "",
             }
             : {
                 type: "long",
@@ -556,6 +603,9 @@ function CourseForm({ initial, saving, categorySuggestions, onCancel, onSave }) 
                 description: "",
                 tagsInput: "",
                 featuresInput: "",
+                icon: "BookOpen",
+                price: "",
+                lessons: "",
             }
     );
 
@@ -588,6 +638,29 @@ function CourseForm({ initial, saving, categorySuggestions, onCancel, onSave }) 
                     rows={3}
                 />
 
+                {/* -------- shared "buy + progress" fields, both types -------- */}
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Price (e.g. ₹4,999 or 'Contact us')" value={form.price} onChange={(e) => setForm({ ...form, price: e.target.value })} />
+                    <Field
+                        label="Lessons (number)"
+                        value={form.lessons}
+                        onChange={(e) => setForm({ ...form, lessons: e.target.value.replace(/[^\d]/g, "") })}
+                        hint="Drives the progress bar students see."
+                    />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                    <Field label="Instructor" value={form.instructor} onChange={(e) => setForm({ ...form, instructor: e.target.value })} />
+                    <SelectField
+                        label="Icon"
+                        value={form.icon}
+                        onChange={(e) => setForm({ ...form, icon: e.target.value })}
+                        options={ICON_KEYS}
+                        hint="Shown on the course card in MyCourses."
+                    />
+                </div>
+                {/* -------------------------------------------------------------- */}
+
                 <div className="grid grid-cols-2 gap-3">
                     <Field label="Duration" value={form.duration} onChange={(e) => setForm({ ...form, duration: e.target.value })} />
                     {isLong ? (
@@ -599,8 +672,7 @@ function CourseForm({ initial, saving, categorySuggestions, onCancel, onSave }) 
 
                 {isLong ? (
                     <>
-                        <Field label="Instructor" value={form.instructor} onChange={(e) => setForm({ ...form, instructor: e.target.value })} />
-                        <Field label="Enroll link" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
+                        <Field label="Enroll link (contact popup)" value={form.link} onChange={(e) => setForm({ ...form, link: e.target.value })} />
                         <TextArea
                             label="Image URLs"
                             value={form.imagesInput}
@@ -669,9 +741,12 @@ function CourseDetail({ course, onClose, onEdit, onDelete }) {
                 </div>
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
+                    <DetailRow label="Instructor" value={course.instructor || "—"} />
+                    <DetailRow label="Price" value={course.price || "—"} />
+                    <DetailRow label="Lessons" value={course.lessons ?? "—"} />
+                    <DetailRow label="Icon" value={course.icon || "—"} />
                     {isLong ? (
                         <>
-                            <DetailRow label="Instructor" value={course.instructor || "—"} />
                             <DetailRow label="Mode" value={course.mode || "—"} />
                             <DetailRow label="Link" value={course.link || "—"} />
                         </>

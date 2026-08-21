@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../data/firebase"; // adjust path to match your project
+import { auth, db } from "../firebase/Firebase"; // adjust path to match your project
 import { Award, Download, Eye, X, Lock } from "lucide-react";
 import { watchForCourseCompletion, listenToCertificates } from "../services/Certificates";
 import { downloadCertificatePdf } from "../services/Certificatepdf";

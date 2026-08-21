@@ -1,13 +1,7 @@
-import React, { useState, useEffect, useRef, useLayoutEffect } from "react";
+import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
 import { Link } from "react-router-dom";
-import { gsap } from "gsap";
-import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { ScrollSmoother } from "gsap/ScrollSmoother";
 import Button from "../components/Buttons"; // adjust path to wherever you save it
 import { motion, animate, useInView } from "framer-motion";
-
-
-gsap.registerPlugin(ScrollTrigger, ScrollSmoother);
 import {
   ArrowRight,
   PlayCircle,
@@ -21,9 +15,13 @@ import {
   Users,
   Award,
 } from "lucide-react";
-import GradientWaves from "../Animiations/GradientWaves";
 import "slot-text/style.css";
 import { SlotText } from "slot-text/react";
+
+// Lazy-loaded: this pulls in the WebGL shader engine, so we defer it
+// until after the rest of the hero has mounted instead of blocking
+// the initial page load for every visitor.
+const GradientWaves = lazy(() => import("../Animiations/GradientWaves"));
 
 /**
  * TOKENS
@@ -200,10 +198,8 @@ function LogoCarousel({
   );
 }
 
-export default function Hero() {          // <-- renamed from HeroSection
+export default function Hero() {
   const [courseIndex, setCourseIndex] = useState(0);
-  const headingRef = useRef(null);
-  const waveRef = useRef(null);
   const isMobile = useIsMobile();
 
   useEffect(() => {
@@ -214,38 +210,6 @@ export default function Hero() {          // <-- renamed from HeroSection
     return () => clearInterval(interval);
   }, []);
 
-  // Fade-in for the main heading only — scoped to headingRef so nothing
-  // else in the hero (badge, buttons, pills, stats) is affected.
-  // ScrollTrigger fires this the moment the heading crosses into view,
-  // instead of firing automatically on mount.
-  useLayoutEffect(() => {
-    const ctx = gsap.context(() => {
-      gsap.from(headingRef.current, {
-        opacity: 0,
-        y: 40,
-        filter: "blur(10px)",
-        duration: 1.6,
-        ease: "expo.out",
-        scrollTrigger: {
-          trigger: headingRef.current,
-          start: "top 85%", // fires when the heading's top hits 85% down the viewport
-          toggleActions: "play none none none", // play once, don't reverse/repeat on scroll back
-          // markers: true, // uncomment while tuning to see the trigger line
-        },
-      });
-
-      // Smooth fade-in for the GradientWaves background on mount —
-      // starts invisible and eases up to full opacity so the wave
-      // doesn't just "pop in" the instant the shader initializes.
-      gsap.fromTo(
-        waveRef.current,
-        { opacity: 0 },
-        { opacity: 1, duration: 2.2, ease: "power2.out" }
-      );
-    }, headingRef);
-
-    return () => ctx.revert();
-  }, []);
   // Stagger container + item variants for the stats strip fade-in
   const statsContainerVariants = {
     hidden: {},
@@ -269,31 +233,40 @@ export default function Hero() {          // <-- renamed from HeroSection
         className="relative w-full min-h-screen overflow-hidden"
         style={{ background: "#150A30" }}
       >
-        {/* full-bleed animated background — dark violet palette */}
-        <div ref={waveRef} className="gradient-waves-container absolute inset-0 z-0">
-          <GradientWaves
-            horizonColor="#5227FF"
-            waveColor="#FF9FFC"
-            crestColor="#FFFFFF"
-            speed={0.4}
-            amplitude={isMobile ? 4 : 2.5}
-            waveScale={isMobile ? 0.9 : 0.6}
-            waveRatio={0.9}
-            swell={isMobile ? 50 : 35}
-            turbulence={isMobile ? 30 : 20}
-            tilt={1.11}
-            zoom={isMobile ? 1.3 : 1}
-            height={isMobile ? 7 : 5.5}
-            fogDepth={isMobile ? 10 : 15}
-            detail={isMobile ? "high" : "medium"}
-            brightness={isMobile ? 1.4 : 1}
-            opacity={1}
-            mouseInteraction
-            parallaxStrength={0.5}
-            grain
-            grainIntensity={0.05}
-          />
-        </div>
+        {/* full-bleed animated background — dark violet palette.
+            Fades in on mount (replaces the old gsap.fromTo opacity tween). */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
+          className="gradient-waves-container absolute inset-0 z-0"
+        >
+          <Suspense fallback={null}>
+            <GradientWaves
+              horizonColor="#5227FF"
+              waveColor="#FF9FFC"
+              crestColor="#FFFFFF"
+              speed={0.4}
+              amplitude={isMobile ? 4 : 2.5}
+              waveScale={isMobile ? 0.9 : 0.6}
+              waveRatio={0.9}
+              swell={isMobile ? 50 : 35}
+              turbulence={isMobile ? 30 : 20}
+              tilt={1.11}
+              zoom={isMobile ? 1.3 : 1}
+              height={isMobile ? 7 : 5.5}
+              fogDepth={isMobile ? 10 : 15}
+              detail={isMobile ? "high" : "medium"}
+              brightness={isMobile ? 1.4 : 1}
+              opacity={1}
+              mouseInteraction
+              parallaxStrength={0.5}
+              grain
+              grainIntensity={0.05}
+            />
+          </Suspense>
+        </motion.div>
+
         {/* extra violet depth — soft glow blobs, layered above the shader */}
         <div
           className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
@@ -331,22 +304,28 @@ export default function Hero() {          // <-- renamed from HeroSection
               <Star size={12} className="fill-white text-white" />
               Skill OS for the AI era
             </span>
-
           </span>
 
-          {/* heading with inline animated course name — fades/slides in on mount */}
-          <h1 ref={headingRef} className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl">
+          {/* heading with inline animated course name — fades/slides in when
+              it scrolls into view (replaces the old gsap + ScrollTrigger tween) */}
+          <motion.h1
+            initial={{ opacity: 0, y: 40, filter: "blur(10px)" }}
+            whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
+            viewport={{ once: true, amount: 0.85 }}
+            transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
+            className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
+          >
             <span className="block">LEARN. GET HIRED. GET PAID.</span>
             <span className="mt-3 flex flex-col items-center justify-center gap-y-2">
-              <span className="font-allura sm:text-7xl text-white">Faster With</span>
-              <span className="text-[#C4B2FF] text-3xl sm:text-7xl">
+              <span className="font-telma sm:text-7xl text-[#C4B2FF]">Faster With</span>
+              <span className="text-[#FFDE21] text-3xl sm:text-7xl">
                 <SlotText
                   text={ROTATING_COURSES[courseIndex]}
                   options={{ direction: "up", stagger: 40 }}
                 />
               </span>
             </span>
-          </h1>
+          </motion.h1>
 
           <p className="mt-5 max-w-md text-base leading-relaxed text-white/75 font-body">
             Turn what you learn into real-world opportunities.
