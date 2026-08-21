@@ -37,7 +37,7 @@ import {
   estimateLessons,
   DEFAULT_PRICE,
   DEFAULT_INSTRUCTOR,
-} from "../lib/coursesmeta";
+} from "../lib/CoursesMeta";
 
 /**
  * MyCourses — Creative Adhyayan (live Firestore version, mobile-first)
