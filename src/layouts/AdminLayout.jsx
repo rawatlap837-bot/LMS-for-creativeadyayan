@@ -2,12 +2,12 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { signOut } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../data/Firebase";
+import { auth, db } from "../firebase/Firebase";
 import {
   LayoutDashboard, Users, BookOpen, PlayCircle, Wallet, BarChart3,
   LogOut, Menu, X, Bell, Search, Check, Circle,
 } from "lucide-react";
-import { AT } from "../AdminDashboards/adminui.jsx";
+import { AT } from "../Admin/adminui.jsx";
 import logo from "../assets/Images/CA2.png"; // swap to CA2.png here if you'd rather use that version
 
 const NAV = [

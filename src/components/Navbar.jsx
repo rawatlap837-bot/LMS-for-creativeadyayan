@@ -10,26 +10,36 @@ import {
   Palette,
   Cpu,
   Layers,
-  ShoppingCart,
+  Calculator,
   ArrowRight,
 } from "lucide-react";
 
+// Category strings here MUST match the category names used in
+// LiveCoursesData.js exactly (case-insensitive match is used as a
+// safety net in LiveCourses.jsx, but exact spelling is safest).
 const NAV_LINKS = [
+  { label: "Home", href: "/" },
   {
     label: "Courses",
     dropdown: [
-      { label: "Digital Marketing", icon: Megaphone, href: "/courses/digital-marketing" },
-      { label: "Web Development", icon: Code2, href: "/courses/web-development" },
-      { label: "UI/UX Design", icon: Palette, href: "/courses/ui-ux-design" },
-      { label: "Software Dev", icon: Cpu, href: "/courses/software-dev" },
-      { label: "Multimedia", icon: Layers, href: "/courses/multimedia" },
-      { label: "E-Commerce", icon: ShoppingCart, href: "/courses/e-commerce" },
+      { label: "Digital Marketing", icon: Megaphone, category: "Digital Marketing" },
+      { label: "Web Development", icon: Code2, category: "Web Development" },
+      { label: "UI/UX Design", icon: Palette, category: "UI/UX Design" },
+      { label: "Software Development", icon: Cpu, category: "Software Development" },
+      { label: "Multimedia", icon: Layers, category: "Multimedia" },
+      { label: "E-Accounting", icon: Calculator, category: "E-Accounting" },
     ],
   },
   { label: "Short Courses", href: "/ShortCourses" },
   { label: "About", href: "/about" },
   { label: "Contact", href: "/contact" },
 ];
+
+// Builds the link for a course-category item: lands on the homepage,
+// preselects that category tab in <LiveCourses />, and scrolls to it.
+function categoryHref(category) {
+  return `/?category=${encodeURIComponent(category)}#live-courses`;
+}
 
 /* ------------------------------------------------------------------
    Neumorphic tokens — soft off-white canvas, dual-tone shadows.
@@ -148,10 +158,10 @@ export default function Navbar() {
                 {coursesOpen && (
                   <div className="absolute left-1/2 top-full w-72 -translate-x-1/2 pt-3">
                     <div className="grid grid-cols-2 gap-2 p-3" style={{ background: CANVAS, borderRadius: 28 }}>
-                      {link.dropdown.map(({ label, icon: Icon, href }) => (
+                      {link.dropdown.map(({ label, icon: Icon, category }) => (
                         <Link
                           key={label}
-                          to={href}
+                          to={categoryHref(category)}
                           onClick={() => setCoursesOpen(false)}
                           onMouseEnter={() => setHoveredLink(label)}
                           onMouseLeave={() => setHoveredLink(null)}
@@ -256,47 +266,51 @@ export default function Navbar() {
             }`}
         >
           <nav className="mx-auto flex max-w-md flex-col gap-3">
-            <button
-              type="button"
-              onClick={() => setMobileCoursesOpen((o) => !o)}
-              aria-expanded={mobileCoursesOpen}
-              className="flex items-center gap-1.5 px-5 py-2.5 text-base font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
-              style={mobileCoursesOpen ? pressed(20) : raisedSm(20)}
-            >
-              Courses
-              <ChevronDown
-                className={`h-4 w-4 transition-transform duration-200 ${mobileCoursesOpen ? "rotate-180" : ""}`}
-              />
-            </button>
-
-            {mobileCoursesOpen && (
-              <div className="grid grid-cols-2 gap-2 p-3" style={pressed(20)}>
-                {NAV_LINKS[0].dropdown.map(({ label, icon: Icon, href }) => (
-                  <Link
-                    key={label}
-                    to={href}
-                    onClick={() => setMobileOpen(false)}
-                    className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700"
-                    style={raisedSm(14)}
+            {NAV_LINKS.map((link) =>
+              link.dropdown ? (
+                <div key={link.label} className="flex flex-col gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setMobileCoursesOpen((o) => !o)}
+                    aria-expanded={mobileCoursesOpen}
+                    className="flex items-center gap-1.5 px-5 py-2.5 text-base font-medium text-slate-700 transition-all hover:text-[#1B0E3D]"
+                    style={mobileCoursesOpen ? pressed(20) : raisedSm(20)}
                   >
-                    <Icon className="h-4 w-4 shrink-0 text-[#5227FF]" strokeWidth={1.75} />
-                    {label}
-                  </Link>
-                ))}
-              </div>
-            )}
+                    {link.label}
+                    <ChevronDown
+                      className={`h-4 w-4 transition-transform duration-200 ${mobileCoursesOpen ? "rotate-180" : ""}`}
+                    />
+                  </button>
 
-            {NAV_LINKS.slice(1).map((link) => (
-              <Link
-                key={link.label}
-                to={link.href}
-                onClick={() => setMobileOpen(false)}
-                className="px-4 py-3.5 text-base font-medium text-slate-700"
-                style={raisedSm(20)}
-              >
-                {link.label}
-              </Link>
-            ))}
+                  {mobileCoursesOpen && (
+                    <div className="grid grid-cols-2 gap-2 p-3" style={pressed(20)}>
+                      {link.dropdown.map(({ label, icon: Icon, category }) => (
+                        <Link
+                          key={label}
+                          to={categoryHref(category)}
+                          onClick={() => setMobileOpen(false)}
+                          className="flex items-center gap-2 px-3 py-2.5 text-sm text-slate-700"
+                          style={raisedSm(14)}
+                        >
+                          <Icon className="h-4 w-4 shrink-0 text-[#5227FF]" strokeWidth={1.75} />
+                          {label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <Link
+                  key={link.label}
+                  to={link.href}
+                  onClick={() => setMobileOpen(false)}
+                  className="px-4 py-3.5 text-base font-medium text-slate-700"
+                  style={raisedSm(20)}
+                >
+                  {link.label}
+                </Link>
+              )
+            )}
 
             <div className="mt-6 flex flex-col gap-3">
               <button

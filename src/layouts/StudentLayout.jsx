@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../data/Firebase";
+import { auth } from "../firebase/Firebase";
 import CA2Logo from "../assets/Images/CA2.png";
 import {
   LayoutDashboard,

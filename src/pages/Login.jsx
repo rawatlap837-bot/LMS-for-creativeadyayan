@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
-import { auth, db } from "../data/Firebase"; // make sure Firebase.js exports `db` (getFirestore(app))
+import { auth, db } from "../firebase/Firebase"; // make sure Firebase.js exports `db` (getFirestore(app))
 import { doc, getDoc } from "firebase/firestore";
 import {
   signInWithEmailAndPassword,

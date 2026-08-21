@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useReducedMotion } from "framer-motion";
 import { CheckCircle2, Clock, ArrowUpRight, Heart, BookOpen, Layers } from "lucide-react";
 import {
@@ -7,6 +8,11 @@ import {
     CATEGORIES as DEFAULT_CATEGORIES,
     COURSES_BY_CATEGORY as DEFAULT_COURSES_BY_CATEGORY,
 } from "../data/LiveCoursesData";
+
+/* ------------------------------------------------------------------ */
+/*  Helpers                                                             */
+/* ------------------------------------------------------------------ */
+const isExternalHref = (href) => typeof href === "string" && /^https?:\/\//.test(href);
 
 /* ------------------------------------------------------------------ */
 /*  Ambient background — pure CSS, zero dependencies.                  */
@@ -163,7 +169,7 @@ function CategoryTabs({ categories, activeIndex, onSelect, counts }) {
 /*  Course media — skeleton while loading, crossfade carousel on       */
 /*  hover (desktop) or auto-cycle (touch), duration badge, gradient.   */
 /* ------------------------------------------------------------------ */
-function CourseMedia({ images, title, duration, link, saved, onToggleSave }) {
+function CourseMedia({ images, title, duration, saved, onToggleSave }) {
     const pics = images?.length ? images : [];
     const [loaded, setLoaded] = useState(false);
     const [active, setActive] = useState(0);
@@ -235,9 +241,16 @@ function CourseMedia({ images, title, duration, link, saved, onToggleSave }) {
                 </span>
             )}
 
+            {/* type="button" + preventDefault/stopPropagation keep this from
+                triggering the parent <Link>'s navigation — without this, every
+                "save" click was also opening the course page. */}
             <button
                 type="button"
-                onClick={onToggleSave}
+                onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    onToggleSave();
+                }}
                 aria-label={saved ? `Remove ${title} from saved` : `Save ${title}`}
                 aria-pressed={saved}
                 className="absolute right-3 top-3 z-10 flex h-9 w-9 items-center justify-center rounded-full bg-white/95 outline-none shadow-sm backdrop-blur-sm transition-transform duration-200 hover:scale-110 focus-visible:ring-2 focus-visible:ring-[#5227FF] sm:right-4 sm:top-4"
@@ -272,11 +285,26 @@ function CourseMedia({ images, title, duration, link, saved, onToggleSave }) {
 /* ------------------------------------------------------------------ */
 const FEATURES_PREVIEW_COUNT = 3;
 
-function CourseCard({ course, index, saved, onToggleSave }) {
+function CourseCard({ course, category, index, saved, onToggleSave }) {
     const extraFeatureCount = Math.max(
         0,
         (course.features?.length ?? 0) - FEATURES_PREVIEW_COUNT
     );
+
+    // Where this card's CTA sends people. Prefer an explicit `course.link`
+    // set in LiveCoursesData.js; otherwise fall back to the app's real
+    // route, /courses/:courseId (see App.jsx — no category segment).
+    const courseId = course.id ?? course.title;
+    const courseHref = course.link || `/courses/${encodeURIComponent(courseId)}`;
+
+    // If `course.link` points off-site (a partner/registration page), use a
+    // plain <a> that opens in a new tab. Otherwise use React Router's <Link>
+    // so navigation stays client-side within the app.
+    const external = isExternalHref(courseHref);
+    const CourseLink = external ? "a" : Link;
+    const courseLinkProps = external
+        ? { href: courseHref, target: "_blank", rel: "noopener noreferrer" }
+        : { to: courseHref };
 
     // subtle 3D tilt that follows the pointer (desktop only — touch devices
     // never fire mousemove, so this is a no-op there). Disabled entirely for
@@ -313,14 +341,15 @@ function CourseCard({ course, index, saved, onToggleSave }) {
             style={{ rotateX, rotateY, transformPerspective: 1000 }}
             className="group flex h-full flex-col overflow-hidden rounded-[28px] border border-violet-100 bg-white shadow-[0_1px_2px_rgba(27,14,61,0.04),0_8px_24px_-12px_rgba(27,14,61,0.12)] transition-all duration-300 hover:border-violet-200 hover:shadow-[0_1px_2px_rgba(27,14,61,0.06),0_24px_48px_-16px_rgba(82,39,255,0.28)]"
         >
-            <CourseMedia
-                images={course.images}
-                title={course.title}
-                duration={course.duration}
-                link={course.link}
-                saved={saved}
-                onToggleSave={onToggleSave}
-            />
+            <CourseLink {...courseLinkProps} className="block" aria-label={`View ${course.title}`}>
+                <CourseMedia
+                    images={course.images}
+                    title={course.title}
+                    duration={course.duration}
+                    saved={saved}
+                    onToggleSave={onToggleSave}
+                />
+            </CourseLink>
 
             <div className="flex flex-1 flex-col p-4 sm:p-6">
                 {course.tags?.length > 0 && (
@@ -336,9 +365,11 @@ function CourseCard({ course, index, saved, onToggleSave }) {
                     </div>
                 )}
 
-                <h3 className="text-base font-bold leading-snug tracking-tight text-[#1B0E3D] sm:text-lg">
-                    {course.title}
-                </h3>
+                <CourseLink {...courseLinkProps} className="hover:text-[#5227FF]">
+                    <h3 className="text-base font-bold leading-snug tracking-tight text-[#1B0E3D] sm:text-lg">
+                        {course.title}
+                    </h3>
+                </CourseLink>
 
                 {course.description && (
                     <p className="mt-2.5 line-clamp-2 text-sm leading-relaxed text-slate-500">
@@ -372,8 +403,8 @@ function CourseCard({ course, index, saved, onToggleSave }) {
                         </span>
                     )}
 
-                    <a
-                        href={course.link || "#"}
+                    <CourseLink
+                        {...courseLinkProps}
                         className="group/cta inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1B0E3D] px-5 py-2.5 text-sm font-semibold text-white outline-none transition-colors duration-200 hover:bg-[#5227FF] focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2"
                     >
                         View Course
@@ -381,7 +412,7 @@ function CourseCard({ course, index, saved, onToggleSave }) {
                             className="h-4 w-4 transition-transform duration-200 group-hover/cta:translate-x-0.5 group-hover/cta:-translate-y-0.5"
                             strokeWidth={2.5}
                         />
-                    </a>
+                    </CourseLink>
                 </div>
             </div>
         </motion.div>
@@ -400,7 +431,9 @@ function CourseCard({ course, index, saved, onToggleSave }) {
  * @param {string} [eyebrow] - small uppercase label above the title.
  * @param {string} title
  * @param {string} subtitle
- * @param {string} [exploreAllHref] - if provided, shows a "Explore all courses" link in the header.
+ * @param {string} [exploreAllHref] - if provided, shows an "Explore all courses" link
+ *   in the header. Internal paths (e.g. "/courses") use client-side routing;
+ *   full URLs (e.g. "https://...") open in a new tab.
  */
 export default function LiveCourses({
     categories = DEFAULT_CATEGORIES,
@@ -412,8 +445,23 @@ export default function LiveCourses({
 }) {
     const [activeIndex, setActiveIndex] = useState(0);
     const [savedIds, setSavedIds] = useState(() => new Set());
+    const [searchParams] = useSearchParams();
     const activeCategory = categories[activeIndex] ?? null;
     const courses = activeCategory ? coursesByCategory[activeCategory] ?? [] : [];
+
+    // Navbar "Courses" dropdown links here as /?category=<name>#live-courses.
+    // Preselect the matching tab (case-insensitive) and scroll the section
+    // into view so the click actually lands on the right course list.
+    useEffect(() => {
+        const requested = searchParams.get("category");
+        if (!requested) return;
+        const idx = categories.findIndex(
+            (c) => c.toLowerCase() === requested.toLowerCase()
+        );
+        if (idx !== -1) setActiveIndex(idx);
+        document.getElementById("live-courses")?.scrollIntoView({ behavior: "smooth" });
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     const categoryCounts = useMemo(() => {
         const counts = {};
@@ -431,8 +479,18 @@ export default function LiveCourses({
         });
     };
 
+    // Same internal/external split as course cards, applied to the header's
+    // "Explore all courses" link.
+    const exploreExternal = isExternalHref(exploreAllHref);
+    const ExploreLink = exploreExternal ? "a" : Link;
+    const exploreLinkProps = exploreAllHref
+        ? exploreExternal
+            ? { href: exploreAllHref, target: "_blank", rel: "noopener noreferrer" }
+            : { to: exploreAllHref }
+        : {};
+
     return (
-        <section className="relative overflow-hidden bg-violet-100 py-10 sm:py-20 lg:py-28">
+        <section id="live-courses" className="relative overflow-hidden bg-violet-100 py-10 sm:py-20 lg:py-28">
             <AmbientBackground />
 
             <div className="relative z-10 mx-auto max-w-[1600px] px-5 sm:px-8 xl:px-12">
@@ -455,13 +513,13 @@ export default function LiveCourses({
                         </div>
 
                         {exploreAllHref && (
-                            <a
-                                href={exploreAllHref}
+                            <ExploreLink
+                                {...exploreLinkProps}
                                 className="inline-flex shrink-0 items-center gap-1 rounded-full px-1 text-xs font-semibold text-[#5227FF] outline-none transition-colors hover:text-[#1B0E3D] focus-visible:ring-2 focus-visible:ring-[#5227FF] sm:text-sm"
                             >
                                 Explore all courses
                                 <ArrowUpRight className="h-3.5 w-3.5" strokeWidth={2.5} />
-                            </a>
+                            </ExploreLink>
                         )}
                     </div>
                 )}
@@ -510,6 +568,7 @@ export default function LiveCourses({
                                             <CourseCard
                                                 key={id}
                                                 course={course}
+                                                category={activeCategory}
                                                 index={i}
                                                 saved={savedIds.has(id)}
                                                 onToggleSave={() => toggleSaved(id)}

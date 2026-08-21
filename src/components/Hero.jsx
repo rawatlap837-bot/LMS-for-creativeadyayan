@@ -38,6 +38,7 @@ const ROTATING_COURSES = [
   "Digital Marketing",
   "Software Development",
   "Web Development",
+  "Artificial Intelligence",
 ];
 
 const QUICK_CATEGORIES = [
@@ -334,23 +335,16 @@ export default function Hero() {          // <-- renamed from HeroSection
           </span>
 
           {/* heading with inline animated course name — fades/slides in on mount */}
-          <h1
-            ref={headingRef}
-            className="mt-6 flex flex-wrap items-center justify-center gap-x-3 font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
-          >
-            <span>Build The 
-              <span className="text-[#7ce681] relative inline-block border-[4px] border-black bg-white px-2 py-1 text-black shadow-[2px_2px_0px_#000] rotate-1 "> SKILL </span>
-              That 
-              <span className="text-[#ffffff] relative inline-block
-                border-[4px] border-black bg-[#FFD43B] px-1 py-2 text-black shadow-[2px_2px_0px_#000] rotate-1"> Shape </span>
-               Your 
-               <span className="text-[#fff7b2] relative inline-block border-[2px] border-black bg-orange-500  px-2 py-1 text-black shadow-[2px_2px_0px_#000] rotate-10 "> FUTURE </span>
-                With</span>
-            <span className="text-[#C4B2FF] text-3xl sm:text-6xl">
-              <SlotText
-                text={ROTATING_COURSES[courseIndex]}
-                options={{ direction: "up", stagger: 40 }}
-              />
+          <h1 ref={headingRef} className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl">
+            <span className="block">LEARN. GET HIRED. GET PAID.</span>
+            <span className="mt-3 flex flex-col items-center justify-center gap-y-2">
+              <span className="font-allura sm:text-7xl text-white">Faster With</span>
+              <span className="text-[#C4B2FF] text-3xl sm:text-7xl">
+                <SlotText
+                  text={ROTATING_COURSES[courseIndex]}
+                  options={{ direction: "up", stagger: 40 }}
+                />
+              </span>
             </span>
           </h1>
 

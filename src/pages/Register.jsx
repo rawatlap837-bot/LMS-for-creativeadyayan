@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
-import { auth } from "../data/Firebase";
+import { auth } from "../firebase/Firebase";
 import {
   createUserWithEmailAndPassword,
   updateProfile,

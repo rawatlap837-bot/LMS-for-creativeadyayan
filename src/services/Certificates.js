@@ -27,7 +27,7 @@ import {
     getDocs,
     Timestamp,
 } from "firebase/firestore";
-import { db } from "..//data/firebase"; // adjust import path to match your project
+import { db } from "../firebase/Firebase"; // adjust import path to match your project
 
 function generateCertificateId(courseId) {
     const rand = Math.random().toString(36).slice(2, 8).toUpperCase();

@@ -58,6 +58,7 @@ export default {
         sm: "calc(var(--radius) - 4px)",
       },
       fontFamily: {
+        allura: ['Allura', 'cursive'],
         display: ["Tirra", "sans-serif"],
         body: ["Pliant", "sans-serif"],
         mono: ["Pochaevsk", "monospace"],
