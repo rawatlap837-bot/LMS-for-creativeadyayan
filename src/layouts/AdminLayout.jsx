@@ -7,7 +7,7 @@ import {
   LayoutDashboard, Users, BookOpen, PlayCircle, Wallet, BarChart3,
   LogOut, Menu, X, Bell, Search, Check, Circle,
 } from "lucide-react";
-import { AT } from "../Admin/adminui.jsx";
+import { AT } from "../Admin/AdminUI";
 import logo from "../assets/Images/CA2.png"; // swap to CA2.png here if you'd rather use that version
 
 const NAV = [
