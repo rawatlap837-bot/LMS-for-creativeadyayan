@@ -18,22 +18,22 @@ const StudentLayout = lazy(() => import('./layouts/StudentLayout.jsx'))
 const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'))
 
 // Student pages — lazy loaded
-const Dashboard = lazy(() => import('./Student/Dashboard.jsx'))
-const MyCourses = lazy(() => import('./Student/MyCourses.jsx'))
-const CoursePlayer = lazy(() => import('./Student/CoursePlayer.jsx'))
-const Progress = lazy(() => import('./Student/Progress.jsx'))
-const Assignments = lazy(() => import('./Student/Assignments.jsx'))
-const Certificates = lazy(() => import('./Student/Certificates.jsx'))
-const Payments = lazy(() => import('./Student/Payments.jsx'))
-const Profile = lazy(() => import('./Student/Profile.jsx'))
+const Dashboard = lazy(() => import('./student/Dashboard.jsx'))
+const MyCourses = lazy(() => import('./student/MyCourses.jsx'))
+const CoursePlayer = lazy(() => import('./student/CoursePlayer.jsx'))
+const Progress = lazy(() => import('./student/Progress.jsx'))
+const Assignments = lazy(() => import('./student/Assignments.jsx'))
+const Certificates = lazy(() => import('./student/Certificates.jsx'))
+const Payments = lazy(() => import('./student/Payments.jsx'))
+const Profile = lazy(() => import('./student/Profile.jsx'))
 
 // Admin pages — lazy loaded
-const AdminDashboard = lazy(() => import('./Admin/AdminDashboard.jsx'))
-const Students = lazy(() => import('./Admin/Students.jsx'))
-const AdminCourses = lazy(() => import('./Admin/Courses.jsx'))
-const Lessons = lazy(() => import('./Admin/Lessons.jsx'))
-const AdminPayments = lazy(() => import('./Admin/Payments.jsx'))
-const Analytics = lazy(() => import('./Admin/Analytics.jsx'))
+const AdminDashboard = lazy(() => import('./admin/AdminDashboard.jsx'))
+const Students = lazy(() => import('./admin/Students.jsx'))
+const AdminCourses = lazy(() => import('./admin/Courses.jsx'))
+const Lessons = lazy(() => import('./admin/Lessons.jsx'))
+const AdminPayments = lazy(() => import('./admin/Payments.jsx'))
+const Analytics = lazy(() => import('./admin/Analytics.jsx'))
 
 function App() {
   return (
