@@ -7,7 +7,7 @@ import { db } from "../firebase/Firebase";
 import { COURSES_BY_CATEGORY as LONG_COURSES_BY_CATEGORY } from "../data/Sitedata.js";
 import {
     AT, Pill, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal,
-} from "./adminUI.jsx";
+} from "./AdminUI";
 import {
     ICON_KEYS, iconForCategory, estimateLessons, DEFAULT_PRICE, DEFAULT_INSTRUCTOR,
 } from "../lib/coursesmeta";

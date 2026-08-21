@@ -6,7 +6,7 @@ import {
 import { db } from "../firebase/Firebase";
 import {
   AT, Pill, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal,
-} from "./adminUI.jsx";
+} from "./AdminUI";
 
 // Firestore collection names — change if yours differ
 const STUDENTS_COLLECTION = "students";

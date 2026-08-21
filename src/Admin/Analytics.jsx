@@ -2,7 +2,7 @@ import {
   AreaChart, Area, BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, Tooltip,
   ResponsiveContainer, Legend,
 } from "recharts";
-import { AT, Card } from "./adminUI.jsx";
+import { AT, Card } from "./AdminUI.jsx";
 
 const enrollTrend = [
   { m: "Mar", v: 210 }, { m: "Apr", v: 260 }, { m: "May", v: 240 },

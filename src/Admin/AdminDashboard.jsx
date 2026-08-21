@@ -5,7 +5,7 @@ import {
 } from "recharts";
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/Firebase.js";
-import { AT, StatCard, Card } from "./adminUI.jsx";
+import { AT, StatCard, Card } from "./AdminUI.jsx";
 
 /* ------------------------------------------------------------------
  * Firestore collection names — change these to match your DB.

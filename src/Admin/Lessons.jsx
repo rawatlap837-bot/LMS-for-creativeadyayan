@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Plus, Pencil, Trash2, GripVertical, PlayCircle, FileText, HelpCircle } from "lucide-react";
-import { AT, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal } from "./adminUI.jsx";
+import { AT, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal } from "./AdminUI.jsx";
 
 const courseOptions = [
   { id: "C-01", title: "Data Structures & Algorithms" },

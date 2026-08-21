@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Wallet, TrendingUp, AlertCircle } from "lucide-react";
-import { AT, Pill, StatCard, Card } from "./adminUI.jsx";
+import { AT, Pill, StatCard, Card } from "./AdminUI.jsx";
 
 const seedPayments = [
   { id: "S-1042", name: "Aarav Sharma", course: "B.Tech CSE", amount: "₹45,000", status: "paid", date: "Aug 2, 2026" },
