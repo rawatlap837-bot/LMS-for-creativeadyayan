@@ -28,12 +28,12 @@ const Payments = lazy(() => import('./student/Payments.jsx'))
 const Profile = lazy(() => import('./student/Profile.jsx'))
 
 // Admin pages — lazy loaded
-const AdminDashboard = lazy(() => import('./admin/AdminDashboard.jsx'))
-const Students = lazy(() => import('./admin/Students.jsx'))
-const AdminCourses = lazy(() => import('./admin/Courses.jsx'))
-const Lessons = lazy(() => import('./admin/Lessons.jsx'))
-const AdminPayments = lazy(() => import('./admin/Payments.jsx'))
-const Analytics = lazy(() => import('./admin/Analytics.jsx'))
+const AdminDashboard = lazy(() => import('./Admin/AdminDashboard.jsx'))
+const Students = lazy(() => import('./Admin/Students.jsx'))
+const AdminCourses = lazy(() => import('./Admin/Courses.jsx'))
+const Lessons = lazy(() => import('./Admin/Lessons.jsx'))
+const AdminPayments = lazy(() => import('./Admin/Payments.jsx'))
+const Analytics = lazy(() => import('./Admin/Analytics.jsx'))
 
 function App() {
   return (
