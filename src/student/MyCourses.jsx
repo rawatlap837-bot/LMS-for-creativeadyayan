@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { forwardRef, useEffect, useMemo, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Search,
@@ -141,12 +141,13 @@ function CourseThumb({ course, children }) {
   );
 }
 
-function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
+const CourseCard = forwardRef(function CourseCard({ course, onOpen, onToggleSave, onBuy }, ref) {
   const isDone = course.status === "Completed";
   const isLocked = !course.purchased;
 
   return (
     <motion.div
+      ref={ref}
       layout
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
@@ -257,7 +258,7 @@ function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
       </div>
     </motion.div>
   );
-}
+});
 
 function CourseModal({ course, onClose, onAdvance }) {
   if (!course) return null;

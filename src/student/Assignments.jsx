@@ -11,6 +11,7 @@ import {
   Lock,
   FileText,
   RefreshCcw,
+  ShieldAlert,
 } from "lucide-react";
 import { auth, db, storage } from "../firebase/Firebase";
 import { onAuthStateChanged } from "firebase/auth";
@@ -30,6 +31,22 @@ import { ref as storageRef, uploadBytes, getDownloadURL } from "firebase/storage
  *   assignments (collection): title, course, due, tags[]
  *   users/{uid}/submissions (subcollection): status, fileName, fileURL,
  *     submittedAt, grade, feedback
+ *
+ * IMPORTANT: if you see a red "permission-denied" error in the console,
+ * this component cannot fix that — it means your Firestore Security Rules
+ * are rejecting the read. Go to Firebase Console → Firestore Database →
+ * Rules and make sure authenticated users can read `assignments` and their
+ * own `users/{uid}/submissions`, e.g.:
+ *
+ *   match /assignments/{assignmentId} {
+ *     allow read: if request.auth != null;
+ *   }
+ *   match /users/{userId}/submissions/{assignmentId} {
+ *     allow read, write: if request.auth != null && request.auth.uid == userId;
+ *   }
+ *
+ * Then click Publish. This component now surfaces that error instead of
+ * silently showing an empty list, so you'll see it clearly if it happens.
  */
 
 const ACCENT = "#5227FF";
@@ -78,7 +95,7 @@ function AssignmentRow({ item, onPickFile, isUploading, uploadError }) {
           className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11"
           style={{ background: `${ACCENT}14`, color: ACCENT }}
         >
-          <ClipboardList className="h-4.5 w-4.5 sm:h-5 sm:w-5" />
+          <ClipboardList className="h-[18px] w-[18px] sm:h-5 sm:w-5" />
         </span>
 
         <div className="min-w-0 flex-1">
@@ -186,7 +203,14 @@ export default function Assignments() {
   const [uid, setUid] = useState(undefined);
   const [rawAssignments, setRawAssignments] = useState([]);
   const [submissions, setSubmissions] = useState({});
-  const [loading, setLoading] = useState(true);
+
+  const [assignmentsLoading, setAssignmentsLoading] = useState(true);
+  const [submissionsLoading, setSubmissionsLoading] = useState(true);
+
+  // Firestore read errors (e.g. permission-denied) surfaced separately
+  // from the "no data yet" empty state, so they're never confused.
+  const [assignmentsError, setAssignmentsError] = useState(null);
+  const [submissionsError, setSubmissionsError] = useState(null);
 
   const [activeFilter, setActiveFilter] = useState("All");
   const [uploadingId, setUploadingId] = useState(null);
@@ -201,24 +225,54 @@ export default function Assignments() {
   }, []);
 
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "assignments"), (snap) => {
-      setRawAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    setAssignmentsLoading(true);
+    setAssignmentsError(null);
+    const unsub = onSnapshot(
+      collection(db, "assignments"),
+      (snap) => {
+        setRawAssignments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+        setAssignmentsLoading(false);
+      },
+      (err) => {
+        console.error("assignments listener error:", err);
+        setAssignmentsError(
+          err.code === "permission-denied"
+            ? "Firestore Security Rules are blocking reads on the 'assignments' collection."
+            : err.message || "Couldn't load assignments."
+        );
+        setAssignmentsLoading(false);
+      }
+    );
     return unsub;
   }, []);
 
   useEffect(() => {
     if (!uid) {
       setSubmissions({});
-      setLoading(false);
+      setSubmissionsLoading(false);
+      setSubmissionsError(null);
       return;
     }
-    const unsub = onSnapshot(collection(db, "users", uid, "submissions"), (snap) => {
-      const next = {};
-      snap.docs.forEach((d) => (next[d.id] = d.data()));
-      setSubmissions(next);
-      setLoading(false);
-    });
+    setSubmissionsLoading(true);
+    setSubmissionsError(null);
+    const unsub = onSnapshot(
+      collection(db, "users", uid, "submissions"),
+      (snap) => {
+        const next = {};
+        snap.docs.forEach((d) => (next[d.id] = d.data()));
+        setSubmissions(next);
+        setSubmissionsLoading(false);
+      },
+      (err) => {
+        console.error("submissions listener error:", err);
+        setSubmissionsError(
+          err.code === "permission-denied"
+            ? "Firestore Security Rules are blocking reads on your submissions."
+            : err.message || "Couldn't load your submissions."
+        );
+        setSubmissionsLoading(false);
+      }
+    );
     return unsub;
   }, [uid]);
 
@@ -306,6 +360,9 @@ export default function Assignments() {
     }
   };
 
+  const loading = assignmentsLoading || submissionsLoading;
+  const fatalError = assignmentsError || submissionsError;
+
   if (uid === undefined) {
     return (
       <div className="flex min-h-[50vh] items-center justify-center">
@@ -338,6 +395,29 @@ export default function Assignments() {
           Track what's due, what you've submitted, and mentor feedback.
         </p>
       </div>
+
+      {/* Firestore rules / permission errors — shown loudly, never confused with "empty" */}
+      {fatalError && (
+        <div
+          className="flex items-start gap-3 rounded-2xl p-3.5 sm:p-4"
+          style={{ background: "#FBE9E7", color: "#8A2A22" }}
+        >
+          <ShieldAlert className="h-5 w-5 shrink-0" />
+          <div className="min-w-0 break-words">
+            <p className="text-sm font-bold">Couldn't load your data</p>
+            <p className="mt-0.5 text-xs leading-relaxed">{fatalError}</p>
+            <p className="mt-1 text-xs leading-relaxed">
+              This is a Firestore Security Rules issue, not a bug in the page — open Firebase
+              Console → Firestore Database → Rules, allow authenticated reads on{" "}
+              <code className="break-all rounded bg-black/5 px-1 py-0.5">assignments</code> and{" "}
+              <code className="break-all rounded bg-black/5 px-1 py-0.5">
+                users/&#123;uid&#125;/submissions
+              </code>
+              , then Publish.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* filters — full-bleed scroll on mobile, scrollbar hidden */}
       <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
@@ -372,7 +452,7 @@ export default function Assignments() {
       </div>
 
       {/* list */}
-      {loading ? (
+      {loading && !fatalError ? (
         <div className="flex items-center justify-center py-20 sm:py-24">
           <Loader2 className="h-6 w-6 animate-spin" style={{ color: ACCENT }} />
         </div>
@@ -392,7 +472,7 @@ export default function Assignments() {
         </div>
       )}
 
-      {!loading && filtered.length === 0 && (
+      {!loading && !fatalError && filtered.length === 0 && (
         <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-white px-4 py-14 text-center shadow-sm sm:py-16">
           <ClipboardList className="h-8 w-8" style={{ color: "#A79BC4" }} />
           <p className="text-sm font-semibold" style={{ color: DARK }}>

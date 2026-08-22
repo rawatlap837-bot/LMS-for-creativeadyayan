@@ -1,5 +1,7 @@
 import React, { memo } from "react";
 import { Users, Briefcase, PlayCircle } from "lucide-react";
+import CircularText from "../Animiations/CircularText";
+import CALogo from "../assets/Images/CA.png";
 
 const BG = "#FFFFFF";
 const INK_TEXT = "#241F3D";
@@ -84,9 +86,6 @@ const coreInnerStyle = {
   boxShadow: "0 10px 40px rgba(124,106,232,0.14)",
 };
 
-const coreEyebrowStyle = { color: VIOLET_DEEP };
-const coreTitleStyle = { color: INK_TEXT };
-
 const sectionBgStyle = { backgroundColor: BG };
 
 const gridTextureStyle = {
@@ -158,25 +157,41 @@ const SpokeCard = memo(function SpokeCard({ card, align = "left" }) {
   );
 });
 
-// Static gradient-ring core. No JS-driven animation loop; CSS handles motion
-// off the main thread, and reduced-motion is respected via media query.
+// Logo-centered core. Outer conic ring + pulse glow stay CSS-only and
+// off the main thread. A CircularText ring spins between the outer ring
+// and the inner circle, which now holds the CA logo instead of text.
 const LearningCore = memo(function LearningCore() {
   return (
     <div className="relative flex h-56 w-56 items-center justify-center sm:h-64 sm:w-64">
       <div className="core-pulse absolute inset-0 rounded-full blur-3xl" style={corePulseStyle} aria-hidden="true" />
+
       <div className="core-spin absolute inset-0 rounded-full" style={coreSpinStyle} aria-hidden="true">
         <div className="h-full w-full rounded-full" style={coreSpinMaskStyle} />
       </div>
+
+      {/* rotating text ring, sitting in the band between the outer ring and the logo circle */}
+      <div className="absolute inset-0 flex items-center justify-center">
+        <CircularText
+          text="EMPOWERING*INDIA*WITH*DIGITAL*SKILLS*"
+          onHover="slowDown"
+          spinDuration={24}
+          size={225}
+          fontSize={15}
+          textColor="#6E63CB"
+        />
+      </div>
+
+      {/* solid inner circle holding the logo */}
       <div
-        className="relative z-10 flex h-[85%] w-[85%] flex-col items-center justify-center rounded-full text-center px-6"
+        className="relative z-10 flex h-[62%] w-[62%] flex-col items-center justify-center rounded-full text-center px-4"
         style={coreInnerStyle}
       >
-        <p className="text-[10px] font-semibold uppercase tracking-[0.2em]" style={coreEyebrowStyle}>
-          Creative Adhyayan
-        </p>
-        <p className="mt-2 text-lg font-bold leading-snug sm:text-xl" style={coreTitleStyle}>
-          Empowering India With Digital Skills.
-        </p>
+        <img
+          src={CALogo}
+          alt="Creative Adhyayan"
+          className="h-30 w-30 object-contain sm:h-40 sm:w-40"
+          draggable="false"
+        />
       </div>
     </div>
   );

@@ -68,7 +68,6 @@ function shouldUseRedirect() {
   const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
   return isMobileUA || isInAppBrowser || isNarrowViewport;
 }
-
 function firebaseAuthErrorMessage(error) {
   switch (error?.code) {
     case "auth/invalid-email":

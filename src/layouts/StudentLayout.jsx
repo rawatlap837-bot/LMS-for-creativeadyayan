@@ -30,14 +30,21 @@ import {
  * sliding active-indicator (framer-motion layoutId), and a mobile drawer
  * that mirrors the Navbar's slide/fade pattern. Topbar carries a greeting,
  * search, notifications, and an account menu wired to Firebase auth.
+ *
+ * Motion system: layout/panel transitions use springs (stiffness 500 /
+ * damping 38–40) for a snappy, consistent "settle" feel; simple
+ * fade/slide reveals use the same eased curve ([0.16, 1, 0.3, 1]) used
+ * elsewhere on the site, so nothing feels like a different hand built it.
  */
 
 const CANVAS = "#ECEEF3";
 const LIGHT = "#ffffff";
-const DARK = "#c7cbd9";
+const BORDER = "#E4E0F5";
 const SIDEBAR_BG = "linear-gradient(165deg, #2C1A5E 0%, #1B0E3D 100%)";
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
+const EASE = [0.16, 1, 0.3, 1];
+const SPRING = { type: "spring", stiffness: 500, damping: 40 };
 const COLLAPSE_KEY = "ca2:sidebar-collapsed";
 
 const NAV_ITEMS = [
@@ -62,6 +69,24 @@ function greetingForHour(hour) {
   if (hour < 12) return "Good morning";
   if (hour < 17) return "Good afternoon";
   return "Good evening";
+}
+
+/** Soft ambient glow behind the sidebar content — same "living gradient"
+ *  language as the site's AmbientBackground blobs, scaled down for a
+ *  260px rail. Purely decorative, so it's aria-hidden. */
+function SidebarGlow() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      <div
+        className="absolute -left-20 -top-10 h-64 w-64 rounded-full opacity-25 blur-[70px]"
+        style={{ background: `radial-gradient(circle, ${ACCENT} 0%, transparent 70%)` }}
+      />
+      <div
+        className="absolute -right-24 bottom-20 h-56 w-56 rounded-full opacity-[0.14] blur-[70px]"
+        style={{ background: `radial-gradient(circle, ${AMBER} 0%, transparent 70%)` }}
+      />
+    </div>
+  );
 }
 
 /** Renders the user's profile photo when available, falling back to
@@ -121,7 +146,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
   const location = useLocation();
 
   return (
-    <div className="flex h-full flex-col px-3 py-5 text-white">
+    <div className="relative z-10 flex h-full flex-col px-3 py-5 text-white">
       {/* brand */}
       <div className={`mb-8 flex items-center gap-2.5 px-2 ${collapsed ? "justify-center" : ""}`}>
         <img src={CA2Logo} alt="Creative Adhyayan" className="h-13 w-13 shrink-0 rounded-lg object-contain" />
@@ -142,7 +167,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
               ref={idx === 0 ? firstLinkRef : undefined}
               onClick={onNavigate}
               aria-current={isActive ? "page" : undefined}
-              className="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
+              className="group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-colors duration-200 hover:bg-white/[0.06] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white"
               style={{ color: isActive ? "#fff" : "rgba(255,255,255,0.62)" }}
               title={collapsed ? label : undefined}
             >
@@ -151,20 +176,20 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
                   layoutId="sidebar-active-pill"
                   className="absolute inset-0 rounded-xl"
                   style={{ background: "rgba(255,255,255,0.10)" }}
-                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  transition={SPRING}
                 />
               )}
               {isActive && (
                 <motion.span
                   layoutId="sidebar-active-bar"
                   className="absolute inset-y-0 left-0 my-auto h-5 w-[3px] rounded-full"
-                  style={{ background: AMBER }}
-                  transition={{ type: "spring", stiffness: 420, damping: 36 }}
+                  style={{ background: AMBER, boxShadow: `0 0 10px ${AMBER}99` }}
+                  transition={SPRING}
                 />
               )}
 
               <Icon
-                className={`relative z-10 h-[18px] w-[18px] shrink-0 transition-transform group-hover:scale-105 ${collapsed ? "mx-auto" : ""
+                className={`relative z-10 h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 ${collapsed ? "mx-auto" : ""
                   }`}
                 strokeWidth={isActive ? 2.25 : 1.85}
               />
@@ -176,7 +201,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
                     initial={{ opacity: 0, width: 0 }}
                     animate={{ opacity: 1, width: "auto" }}
                     exit={{ opacity: 0, width: 0 }}
-                    transition={{ duration: 0.16 }}
+                    transition={{ duration: 0.18, ease: EASE }}
                     className="relative z-10 overflow-hidden whitespace-nowrap"
                   >
                     {label}
@@ -187,7 +212,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
               {/* collapsed tooltip */}
               {collapsed && (
                 <span
-                  className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#1B0E3D] opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
+                  className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#1B0E3D] opacity-0 shadow-lg shadow-black/20 transition-opacity duration-150 group-hover:opacity-100"
                   style={{ background: LIGHT }}
                 >
                   {label}
@@ -203,16 +228,16 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
         <button
           type="button"
           onClick={onLogout}
-          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-colors hover:bg-white/5 hover:text-white ${collapsed ? "justify-center" : ""
+          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-colors duration-200 hover:bg-white/[0.06] hover:text-white ${collapsed ? "justify-center" : ""
             }`}
           title={collapsed ? "Log out" : undefined}
         >
-          <LogOut className="h-[18px] w-[18px] shrink-0" strokeWidth={1.85} />
+          <LogOut className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" strokeWidth={1.85} />
           {!collapsed && <span>Log out</span>}
         </button>
 
         <div className={`mt-3 flex items-center gap-2.5 rounded-xl px-2 py-2 ${collapsed ? "justify-center" : ""}`}>
-          <Avatar user={user} size={32} />
+          <Avatar user={user} size={32} className="ring-2 ring-white/10" />
           {!collapsed && (
             <div className="min-w-0">
               {user === undefined ? (
@@ -277,12 +302,18 @@ export default function StudentLayout() {
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     if (mobileOpen) {
-      // move focus into the drawer for keyboard/screen-reader users
-      const id = requestAnimationFrame(() => drawerFirstLinkRef.current?.focus());
+      // move focus into the drawer for keyboard/screen-reader users.
+      // preventScroll: true — without it, focusing an element the browser
+      // considers "off-screen" (e.g. behind the topbar) silently scrolls
+      // the whole page to reveal it, which on a page with any horizontal
+      // overflow can shove the viewport sideways.
+      const id = requestAnimationFrame(() =>
+        drawerFirstLinkRef.current?.focus({ preventScroll: true })
+      );
       return () => cancelAnimationFrame(id);
     }
-    // return focus to the trigger when the drawer closes
-    mobileMenuBtnRef.current?.focus();
+    // return focus to the trigger when the drawer closes — same reasoning
+    mobileMenuBtnRef.current?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = "";
     };
@@ -396,11 +427,10 @@ export default function StudentLayout() {
   const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
   const firstName = (user?.displayName || "there").split(" ")[0];
   const greeting = greetingForHour(new Date().getHours());
+  const isOverview = location.pathname === "/dashboard";
 
   return (
-    <div className="flex min-h-screen" style={{ background: CANVAS }}>
-      {/* skip link for keyboard users */}
-
+    <div className="flex min-h-screen overflow-x-hidden" style={{ background: CANVAS }}>
       {/* logout error toast */}
       <AnimatePresence>
         {logoutError && (
@@ -409,7 +439,7 @@ export default function StudentLayout() {
             initial={{ opacity: 0, y: -12, scale: 0.96 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -12, scale: 0.96 }}
-            transition={{ type: "spring", stiffness: 380, damping: 30 }}
+            transition={SPRING}
             className="fixed left-1/2 top-4 z-[60] flex w-[calc(100%-2rem)] max-w-sm -translate-x-1/2 items-start gap-3 rounded-2xl border border-red-100 bg-white py-3 pl-3 pr-2 shadow-xl shadow-red-900/10"
             style={{ borderLeft: "4px solid #DC2626" }}
           >
@@ -432,40 +462,19 @@ export default function StudentLayout() {
       {/* ================= DESKTOP SIDEBAR ================= */}
       <motion.aside
         animate={{ width: collapsed ? 84 : 260 }}
-        transition={{ type: "spring", stiffness: 320, damping: 34 }}
+        transition={SPRING}
         className="sticky top-0 hidden h-screen shrink-0 lg:block"
         style={{ background: SIDEBAR_BG }}
       >
-        <SidebarContent
-          collapsed={collapsed}
-          user={user}
-          onLogout={handleLogout}
-          onNavigate={() => { }}
-        />
-
-        {/* collapse toggle */}
-        <button
-          type="button"
-          onClick={() => setCollapsed((c) => !c)}
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          aria-pressed={collapsed}
-          className="group absolute -right-4 top-11 z-10 flex h-8 w-8 items-center justify-center rounded-full border-2 border-white shadow-lg transition-all hover:scale-110 hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
-          style={{ background: ACCENT, outlineColor: AMBER }}
-        >
-          <ChevronsLeft
-            className={`h-5 w-5 text-white transition-transform duration-300 ${collapsed ? "rotate-180" : ""
-              }`}
-            strokeWidth={2.75}
+        <div className="relative h-full overflow-hidden">
+          <SidebarGlow />
+          <SidebarContent
+            collapsed={collapsed}
+            user={user}
+            onLogout={handleLogout}
+            onNavigate={() => { }}
           />
-
-          {/* tooltip */}
-          <span
-            className="pointer-events-none absolute left-full top-1/2 z-20 ml-2 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-white opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100"
-            style={{ background: "#1B0E3D" }}
-          >
-            {collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          </span>
-        </button>
+        </div>
       </motion.aside>
 
       {/* ================= MOBILE DRAWER ================= */}
@@ -477,8 +486,9 @@ export default function StudentLayout() {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
+              transition={{ duration: 0.2, ease: EASE }}
               onClick={closeMobileNav}
-              className="fixed inset-0 z-40 bg-black/40 lg:hidden"
+              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden"
               aria-hidden="true"
             />
             <motion.aside
@@ -489,55 +499,87 @@ export default function StudentLayout() {
               initial={{ x: "-100%" }}
               animate={{ x: 0 }}
               exit={{ x: "-100%" }}
-              transition={{ type: "spring", stiffness: 340, damping: 34 }}
-              className="fixed inset-y-0 left-0 z-50 w-[78%] max-w-[280px] lg:hidden"
+              transition={SPRING}
+              className="fixed inset-y-0 left-0 z-50 w-[72%] max-w-[240px] shadow-2xl shadow-black/30 lg:hidden"
               style={{ background: SIDEBAR_BG }}
             >
               <button
                 type="button"
                 onClick={closeMobileNav}
                 aria-label="Close menu"
-                className="absolute right-3 top-4 flex h-8 w-8 items-center justify-center rounded-full text-white/70 hover:text-white"
+                className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:scale-95"
               >
                 <X className="h-4 w-4" />
               </button>
-              <SidebarContent
-                collapsed={false}
-                user={user}
-                onLogout={handleLogout}
-                onNavigate={closeMobileNav}
-                firstLinkRef={drawerFirstLinkRef}
-              />
+              <div className="relative h-full overflow-hidden">
+                <SidebarGlow />
+                <SidebarContent
+                  collapsed={false}
+                  user={user}
+                  onLogout={handleLogout}
+                  onNavigate={closeMobileNav}
+                  firstLinkRef={drawerFirstLinkRef}
+                />
+              </div>
             </motion.aside>
           </>
         )}
       </AnimatePresence>
 
       {/* ================= MAIN COLUMN ================= */}
-      <div className="flex min-h-screen flex-1 flex-col">
+      <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
         {/* topbar */}
         <header
-          className="sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3.5 backdrop-blur sm:px-6"
-          style={{ background: "rgba(236,238,243,0.85)", borderColor: DARK }}
+          className="sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3.5 shadow-sm shadow-violet-900/[0.03] backdrop-blur-md sm:px-6"
+          style={{ background: "rgba(236,238,243,0.85)", borderColor: BORDER }}
         >
           <button
             ref={mobileMenuBtnRef}
             type="button"
             onClick={() => setMobileOpen(true)}
             aria-label="Open menu"
-            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] lg:hidden"
+            className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95 lg:hidden"
             style={{ background: LIGHT }}
           >
             <Menu className="h-4 w-4" />
           </button>
 
+          <button
+            type="button"
+            onClick={() => setCollapsed((c) => !c)}
+            aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+            aria-pressed={collapsed}
+            className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] shadow-sm transition-all duration-200 hover:scale-105 hover:bg-violet-50 active:scale-95 lg:flex"
+            style={{ background: LIGHT }}
+          >
+            <ChevronsLeft
+              className={`h-4 w-4 transition-transform duration-300 ease-out ${collapsed ? "rotate-180" : ""}`}
+              strokeWidth={2.25}
+            />
+          </button>
+
           <div className="min-w-0 flex-1">
             <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-[#8A82A6]">
-              {location.pathname === "/dashboard" ? "Overview" : "Student Dashboard"}
+              {isOverview ? "Overview" : "Student Dashboard"}
             </p>
-            <h1 className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl">
-              {location.pathname === "/dashboard" ? `${greeting}, ${firstName}` : pageTitle}
-            </h1>
+            <AnimatePresence mode="wait">
+              <motion.h1
+                key={location.pathname}
+                initial={{ opacity: 0, y: -4 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 4 }}
+                transition={{ duration: 0.18, ease: EASE }}
+                className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl"
+              >
+                {isOverview ? (
+                  <>
+                    {greeting}, <span style={{ color: ACCENT }}>{firstName}</span>
+                  </>
+                ) : (
+                  pageTitle
+                )}
+              </motion.h1>
+            </AnimatePresence>
           </div>
 
           {/* search — desktop only */}
@@ -560,7 +602,7 @@ export default function StudentLayout() {
                 onKeyDown={handleSearchKeyDown}
                 placeholder="Search courses, lessons…"
                 aria-label="Search courses and lessons"
-                className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none ring-1 ring-transparent transition focus:ring-2"
+                className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] shadow-sm outline-none ring-1 ring-transparent transition-all duration-200 placeholder:text-[#A79BC4] focus:shadow-md focus:shadow-violet-200/40 focus:ring-2"
                 style={{ "--tw-ring-color": ACCENT }}
               />
               {!searchValue && (
@@ -576,7 +618,7 @@ export default function StudentLayout() {
                     searchRef.current?.focus();
                   }}
                   aria-label="Clear search"
-                  className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full text-[#A79BC4] hover:text-[#1B0E3D]"
+                  className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full text-[#A79BC4] transition-colors hover:bg-violet-50 hover:text-[#1B0E3D]"
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -591,8 +633,8 @@ export default function StudentLayout() {
                   initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-full z-20 mt-2 w-full overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                  transition={SPRING}
+                  className="absolute right-0 top-full z-20 mt-2 w-full origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
                 >
                   {searchResults.length === 0 ? (
                     <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">
@@ -605,7 +647,7 @@ export default function StudentLayout() {
                           type="button"
                           onMouseEnter={() => setActiveResultIndex(idx)}
                           onClick={() => selectSearchResult(item)}
-                          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors ${idx === activeResultIndex
+                          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${idx === activeResultIndex
                             ? "bg-violet-50 text-[#1B0E3D]"
                             : "text-[#4A3D66] hover:bg-violet-50"
                             }`}
@@ -626,19 +668,27 @@ export default function StudentLayout() {
             <button
               type="button"
               onClick={() => setNotifOpen((o) => !o)}
-              aria-label="Notifications"
+              aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : "Notifications"}
               aria-expanded={notifOpen}
               aria-haspopup="menu"
-              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] transition-transform hover:scale-105"
+              className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] shadow-sm transition-transform duration-200 hover:scale-105 active:scale-95"
               style={{ background: LIGHT }}
             >
               <Bell className="h-4 w-4" />
-              {unreadCount > 0 && (
-                <span
-                  className="absolute right-2 top-2 h-1.5 w-1.5 rounded-full"
-                  style={{ background: AMBER }}
-                />
-              )}
+              <AnimatePresence>
+                {unreadCount > 0 && (
+                  <motion.span
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    exit={{ scale: 0, opacity: 0 }}
+                    transition={SPRING}
+                    className="absolute -right-0.5 -top-0.5 flex h-4 min-w-[16px] items-center justify-center rounded-full px-1 text-[9px] font-bold text-white"
+                    style={{ background: AMBER }}
+                  >
+                    {unreadCount > 9 ? "9+" : unreadCount}
+                  </motion.span>
+                )}
+              </AnimatePresence>
             </button>
 
             <AnimatePresence>
@@ -648,8 +698,8 @@ export default function StudentLayout() {
                   initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-full z-20 mt-2 w-72 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                  transition={SPRING}
+                  className="absolute right-0 top-full z-20 mt-2 w-72 origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
                 >
                   <div className="flex items-center justify-between px-3 py-2">
                     <p className="text-sm font-semibold text-[#1B0E3D]">Notifications</p>
@@ -657,7 +707,7 @@ export default function StudentLayout() {
                       <button
                         type="button"
                         onClick={markAllNotificationsRead}
-                        className="text-xs font-semibold text-[#5227FF] hover:underline"
+                        className="text-xs font-semibold text-[#5227FF] transition-colors hover:text-[#1B0E3D] hover:underline"
                       >
                         Mark all read
                       </button>
@@ -665,15 +715,18 @@ export default function StudentLayout() {
                   </div>
                   <div className="my-1 h-px bg-violet-100" />
                   {notifications.length === 0 ? (
-                    <p className="px-3 py-6 text-center text-sm text-[#8A82A6]">
-                      You're all caught up.
-                    </p>
+                    <div className="flex flex-col items-center gap-2 px-3 py-8 text-center">
+                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-violet-50">
+                        <Bell className="h-4 w-4 text-[#A79BC4]" />
+                      </span>
+                      <p className="text-sm text-[#8A82A6]">You're all caught up.</p>
+                    </div>
                   ) : (
                     <ul className="max-h-72 overflow-y-auto">
                       {notifications.map((n) => (
                         <li key={n.id}>
                           <div
-                            className={`rounded-xl px-3 py-2.5 text-sm ${n.read ? "text-[#8A82A6]" : "bg-violet-50/60 text-[#1B0E3D]"
+                            className={`rounded-xl px-3 py-2.5 text-sm transition-colors ${n.read ? "text-[#8A82A6]" : "bg-violet-50/60 text-[#1B0E3D]"
                               }`}
                           >
                             <p className="font-medium">{n.title}</p>
@@ -695,11 +748,11 @@ export default function StudentLayout() {
               onClick={() => setAccountOpen((o) => !o)}
               aria-expanded={accountOpen}
               aria-haspopup="menu"
-              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-white"
+              className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors duration-200 hover:bg-white"
             >
-              <Avatar user={user} size={28} />
+              <Avatar user={user} size={28} className="ring-2 ring-white transition-shadow duration-200" />
               <ChevronDown
-                className={`hidden h-3.5 w-3.5 text-[#1B0E3D] transition-transform sm:block ${accountOpen ? "rotate-180" : ""
+                className={`hidden h-3.5 w-3.5 text-[#1B0E3D] transition-transform duration-200 sm:block ${accountOpen ? "rotate-180" : ""
                   }`}
               />
             </button>
@@ -711,8 +764,8 @@ export default function StudentLayout() {
                   initial={{ opacity: 0, y: -6, scale: 0.98 }}
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={{ duration: 0.15 }}
-                  className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                  transition={SPRING}
+                  className="absolute right-0 top-full mt-2 w-52 origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
                 >
                   <div className="px-3 py-2">
                     <p className="truncate text-sm font-semibold text-[#1B0E3D]">
@@ -725,7 +778,7 @@ export default function StudentLayout() {
                     to="/dashboard/profile"
                     role="menuitem"
                     onClick={() => setAccountOpen(false)}
-                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-[#4A3D66] hover:bg-violet-50"
+                    className="flex items-center gap-2.5 rounded-xl px-3 py-2 text-sm font-medium text-[#4A3D66] transition-colors hover:bg-violet-50"
                   >
                     <Settings className="h-4 w-4" />
                     Account settings
@@ -734,7 +787,7 @@ export default function StudentLayout() {
                     type="button"
                     role="menuitem"
                     onClick={handleLogout}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 hover:bg-red-50"
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium text-red-600 transition-colors hover:bg-red-50"
                   >
                     <LogOut className="h-4 w-4" />
                     Log out
@@ -745,9 +798,19 @@ export default function StudentLayout() {
           </div>
         </header>
 
-        {/* routed page content */}
-        <main id="main-content" className="flex-1 px-4 py-6 sm:px-6 lg:px-8">
-          <Outlet />
+        {/* routed page content — soft fade/slide on every route change */}
+        <main id="main-content" className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={location.pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -6 }}
+              transition={{ duration: 0.22, ease: EASE }}
+            >
+              <Outlet />
+            </motion.div>
+          </AnimatePresence>
         </main>
       </div>
     </div>

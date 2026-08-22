@@ -4,79 +4,70 @@ import styled from 'styled-components';
 const Button = () => {
   return (
     <StyledWrapper>
-      <button className="button">
-        <span>Get Skilled Now</span>
-      </button>
+      <button className="btn-donate">Exlpore Courses</button>
     </StyledWrapper>
   );
 }
 
 const StyledWrapper = styled.div`
-  display: flex;
-  justify-content: center;
-
-  .button {
-    width: 160px;
-    padding: 0;
-    border: none;
-    transform: rotate(3deg);
-    transform-origin: center;
-    font-family: "Gochi Hand", cursive, sans-serif;
-    text-decoration: none;
-    font-size: 18px;
+  .btn-donate {
+    --clr-font-main: hsla(0 0% 20% / 100);
+    --btn-bg-1: hsla(280 100% 74% / 1);
+    --btn-bg-2: hsla(262 83% 58% / 1);
+    --btn-bg-color: hsla(360 100% 100% / 1);
+    --radii: 0.5em;
     cursor: pointer;
-    padding-bottom: 4px;
-    border-radius: 8px;
-    box-shadow: 0 3px 0 #494a4b;
-    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-    background-color: #5cdb95;
+    padding: 0.9em 1.4em;
+    min-width: 120px;
+    min-height: 44px;
+    font-size: var(--size, 1rem);
+    font-weight: 500;
+    transition: 0.8s;
+    background-size: 280% auto;
+    background-image: linear-gradient(
+      325deg,
+      var(--btn-bg-2) 0%,
+      var(--btn-bg-1) 55%,
+      var(--btn-bg-2) 90%
+    );
+    border: none;
+    border-radius: var(--radii);
+    color: var(--btn-bg-color);
+    box-shadow:
+      0px 0px 20px rgba(139, 92, 246, 0.5),
+      0px 5px 5px -1px rgba(109, 63, 192, 0.25),
+      inset 4px 4px 8px rgba(216, 189, 250, 0.5),
+      inset -4px -4px 8px rgba(82, 39, 255, 0.35);
   }
-
-  .button span {
-    background: #f1f5f8;
-    display: block;
-    padding: 0.55rem 0.7rem;
-    border-radius: 8px;
-    border: 2px solid #494a4b;
-    white-space: nowrap;
+  .btn-donate:hover {
+    background-position: right top;
   }
-
-  .button:active {
-    transform: translateY(5px);
-    padding-bottom: 0px;
-    outline: 0;
+  .btn-donate:is(:focus, :focus-visible, :active) {
+    outline: none;
+    box-shadow:
+      0 0 0 3px var(--btn-bg-color),
+      0 0 0 6px var(--btn-bg-2);
   }
-
-  @media (max-width: 380px) {
-    .button {
-      width: 150px;
-      font-size: 16px;
-      transform: rotate(2deg);
-    }
-    .button span {
-      padding: 0.5rem 0.6rem;
-    }
-  }
-
   @media (min-width: 640px) {
-    .button {
-      width: 200px;
-      font-size: 22px;
-    }
-    .button span {
-      padding: 0.75rem 1rem;
+    .btn-donate {
+      padding: 1.1em 1.9em;
+      min-width: 160px;
+      min-height: 52px;
+      font-size: 1.15rem;
     }
   }
-
   @media (min-width: 1024px) {
-    .button {
-      width: 220px;
-      font-size: 24px;
-    }
-    .button span {
-      padding: 0.85rem 1.1rem;
+    .btn-donate {
+      padding: 0.5em 1.5em;
+      min-width: 190px;
+      min-height: 58px;
+      font-size: 1.7rem;
     }
   }
-`;
+  @media (prefers-reduced-motion: reduce) {
+    .btn-donate {
+      transition: linear;
+    }
+  }`;
 
 export default Button;

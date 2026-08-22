@@ -317,29 +317,30 @@ const HeroBackground = memo(function HeroBackground({ isMobile }) {
       >
         <Suspense fallback={null}>
           <GradientWaves
-            horizonColor="#5227FF"
-            waveColor="#FF9FFC"
+            horizonColor="#a627ff"
+            waveColor="#7C3AED"
             crestColor="#FFFFFF"
-            speed={0.4}
-            amplitude={isMobile ? 4 : 2.5}
-            waveScale={isMobile ? 0.9 : 0.6}
-            waveRatio={0.9}
-            swell={isMobile ? 50 : 35}
-            turbulence={isMobile ? 30 : 20}
-            tilt={1.11}
-            zoom={isMobile ? 1.3 : 1}
-            height={isMobile ? 7 : 5.5}
-            fogDepth={isMobile ? 10 : 15}
-            detail={isMobile ? "high" : "medium"}
-            brightness={isMobile ? 1.4 : 1}
+            speed={0.8}
+            amplitude={2.5}
+            waveScale={0.75}
+            waveRatio={0.8}
+            swell={35}
+            turbulence={16.5}
+            tilt={0.92}
+            zoom={1.05}
+            height={3.5}
+            fogDepth={15}
+            detail="high"
+            brightness={1}
             opacity={1}
             mouseInteraction
-            parallaxStrength={0.5}
+            parallaxStrength={0.23}
             grain
             grainIntensity={0.05}
           />
         </Suspense>
       </motion.div>
+
 
       <div
         className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
@@ -405,22 +406,20 @@ export default function Hero() {
             className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
             <span className="block">LEARN. GET HIRED. GET PAID.</span>
-            <span className=" flex flex-col items-center justify-center">
-              <span className="font-telma sm:text-7xl text-[#C4B2FF]">Faster With</span>
-              <RotatingCourseWord words={ROTATING_COURSES} />
+            <span className="flex flex-col items-center justify-center">
+              <span className="font-telma text-3xl sm:text-7xl text-[#C4B2FF] leading-none">
+                Faster With
+              </span>
+              <span className="-mt-1 sm:-mt-3">
+                <RotatingCourseWord words={ROTATING_COURSES} />
+              </span>
             </span>
           </motion.h1>
-
-          <p className="mt-5 max-w-md text-base leading-relaxed text-white/75 font-body">
-            Turn what you learn into real-world opportunities.
-          </p>
-
+          <StatsStrip />
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
             <Button href="#programs" text="Get skilled now" />
           </div>
 
-          <QuickCategories />
-          <StatsStrip />
         </div>
       </section>
 
