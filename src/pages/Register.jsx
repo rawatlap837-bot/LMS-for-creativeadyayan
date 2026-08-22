@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
 import Cubes from "../Animiations/Cubes";
@@ -93,6 +93,17 @@ export default function RegisterForm() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const cubesRef = useRef(null);
   const navigate = useNavigate();
+
+  // Scroll to the very top whenever this page mounts — e.g. when the user
+  // clicks "Register" / "Create account" in the navbar from somewhere
+  // scrolled down on another page. The documentElement/body fallback
+  // covers older/mobile Safari, where window.scrollTo alone can be
+  // unreliable right after a route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
 
   const strength = passwordStrength(form.password);
 

@@ -1,12 +1,18 @@
-import React, { useState, useEffect, useRef, lazy, Suspense } from "react";
+import React, {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback,
+  memo,
+  lazy,
+  Suspense,
+} from "react";
 import { Link } from "react-router-dom";
 import Button from "../components/Buttons"; // adjust path to wherever you save it
 import { motion, animate, useInView } from "framer-motion";
 import {
-  ArrowRight,
-  PlayCircle,
   Star,
-  ChevronDown,
   Megaphone,
   Code2,
   Palette,
@@ -46,29 +52,46 @@ const QUICK_CATEGORIES = [
   { label: "Software Dev", icon: Cpu, href: "/courses/software-dev" },
 ];
 
-// numeric `value` + optional `decimals`/`prefix`/`suffix` so AnimatedStatValue
-// can count up to the real number instead of just fading in static text
 const STATS = [
   { icon: BookOpen, value: 24, label: "Courses" },
   { icon: Users, value: 12000, suffix: "+", label: "Learners" },
   { icon: Award, value: 4.8, decimals: 1, suffix: " / 5", label: "Avg. rating" },
 ];
 
+// Hoisted outside the component so these plain objects aren't
+// re-created (and don't trigger new prop identities) on every render.
+const STATS_CONTAINER_VARIANTS = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.12, delayChildren: 0.1 } },
+};
+
+const STATS_ITEM_VARIANTS = {
+  hidden: { opacity: 0, y: 14 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: "easeOut" } },
+};
+
+const SCRIM_MOBILE =
+  "linear-gradient(180deg, rgba(10,4,26,0.30) 0%, rgba(10,4,26,0.02) 35%, rgba(10,4,26,0.40) 100%)";
+const SCRIM_DESKTOP =
+  "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)";
+
 /**
- * Responsive breakpoint hook — used so GradientWaves gets stronger
- * amplitude/brightness/zoom on small screens, where the shader otherwise
- * reads as too subtle against the readability scrim.
+ * Responsive breakpoint hook — debounced so a window drag doesn't fire a
+ * state update (and a full re-render) on every single resize tick, and
+ * seeded with matchMedia so there's no layout flash on mount.
  */
 function useIsMobile(breakpoint = 768) {
-  const [isMobile, setIsMobile] = useState(
-    typeof window !== "undefined" ? window.innerWidth < breakpoint : false
+  const query = `(max-width: ${breakpoint - 1}px)`;
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== "undefined" ? window.matchMedia(query).matches : false
   );
 
   useEffect(() => {
-    const handleResize = () => setIsMobile(window.innerWidth < breakpoint);
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, [breakpoint]);
+    const mql = window.matchMedia(query);
+    const handleChange = (e) => setIsMobile(e.matches);
+    mql.addEventListener("change", handleChange);
+    return () => mql.removeEventListener("change", handleChange);
+  }, [query]);
 
   return isMobile;
 }
@@ -77,10 +100,16 @@ function useIsMobile(breakpoint = 768) {
  * ---- Animated count-up number ----
  *
  * Animates from 0 up to `value` once the element scrolls into view.
- * Supports decimals (e.g. 4.8), thousands separators (e.g. 12,000),
- * and an optional prefix/suffix (e.g. "+", " / 5").
+ * Memoized: its props are static per-stat, so it never needs to
+ * re-render when a sibling stat or the parent Hero re-renders.
  */
-function AnimatedStatValue({ value, decimals = 0, prefix = "", suffix = "", className }) {
+const AnimatedStatValue = memo(function AnimatedStatValue({
+  value,
+  decimals = 0,
+  prefix = "",
+  suffix = "",
+  className,
+}) {
   const ref = useRef(null);
   const isInView = useInView(ref, { once: true, amount: 0.6 });
   const [display, setDisplay] = useState((0).toFixed(decimals));
@@ -93,10 +122,12 @@ function AnimatedStatValue({ value, decimals = 0, prefix = "", suffix = "", clas
       ease: [0.16, 1, 0.3, 1], // easeOutExpo-ish — quick start, gentle settle
       onUpdate(latest) {
         const rounded = decimals ? latest.toFixed(decimals) : Math.round(latest);
-        setDisplay(Number(rounded).toLocaleString(undefined, {
-          minimumFractionDigits: decimals,
-          maximumFractionDigits: decimals,
-        }));
+        setDisplay(
+          Number(rounded).toLocaleString(undefined, {
+            minimumFractionDigits: decimals,
+            maximumFractionDigits: decimals,
+          })
+        );
       },
     });
 
@@ -110,19 +141,13 @@ function AnimatedStatValue({ value, decimals = 0, prefix = "", suffix = "", clas
       {suffix}
     </span>
   );
-}
+});
 
 /**
- * ---- Carousel logos (Tailwind version) ----
+ * ---- Carousel logos ----
  *
  * Auto-imports every image in src/assets/Carousel at build time via Vite's
- * import.meta.glob, so you never have to type out filenames by hand. Path
- * is relative to THIS file — since this file lives in src/pages/, "../assets"
- * correctly points to src/assets.
- *
- * Each logo now sits inside a card styled to match the "24 / Courses" stat
- * card from the hero section: translucent dark-purple fill, thin light
- * border, soft rounded corners.
+ * import.meta.glob, so you never have to type out filenames by hand.
  */
 const logoModules = import.meta.glob(
   "../assets/Carousel/*.{png,jpg,jpeg,svg,webp,PNG,JPG,JPEG}",
@@ -136,22 +161,23 @@ function filenameToAlt(path) {
   return raw.replace(/[-_]/g, " ").trim();
 }
 
+// Computed once at module load, not on every render.
 const AUTO_LOGOS = Object.entries(logoModules).map(([path, src]) => ({
   src,
   alt: filenameToAlt(path),
 }));
 
-function LogoCarousel({
+const LogoCarousel = memo(function LogoCarousel({
   logos = AUTO_LOGOS,
   speed = 30, // seconds per full loop — higher = slower
   pauseOnHover = true,
 }) {
-  const track = [...logos, ...logos]; // duplicated so the loop is seamless
+  // Duplicated so the loop is seamless — memoized so it isn't rebuilt
+  // (and the DOM list isn't rekeyed) on every parent render.
+  const track = useMemo(() => [...logos, ...logos], [logos]);
 
   return (
-    <div
-      className="relative w-full py-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent_0%,#000_5%,#000_95%,transparent_100%)]"
-    >
+    <div className="relative w-full py-1 overflow-hidden [mask-image:linear-gradient(to_right,transparent_0%,#000_5%,#000_95%,transparent_100%)]">
       <div
         className={`flex items-center w-max gap-4 sm:gap-10 md:gap-16 will-change-transform animate-[cl-scroll_var(--cl-speed)_linear_infinite] ${pauseOnHover ? "hover:[animation-play-state:paused]" : ""
           }`}
@@ -166,6 +192,10 @@ function LogoCarousel({
               <img
                 src={logo.src}
                 alt={logo.alt}
+                loading="lazy"
+                decoding="async"
+                width={96}
+                height={40}
                 className="h-6 sm:h-8 md:h-10 w-auto object-contain select-none"
                 draggable={false}
               />
@@ -178,11 +208,9 @@ function LogoCarousel({
         ))}
       </div>
 
-      {/* edge fades */}
       <div className="pointer-events-none absolute inset-y-0 left-0 w-20 bg-gradient-to-r from-[#F4F2FA] to-transparent" />
       <div className="pointer-events-none absolute inset-y-0 right-0 w-20 bg-gradient-to-l from-[#F4F2FA] to-transparent" />
 
-      {/* keyframes + reduced-motion (Tailwind has no built-in scroll keyframe, so we declare it once here) */}
       <style>{`
         @keyframes cl-scroll {
           from { transform: translateX(0); }
@@ -196,36 +224,153 @@ function LogoCarousel({
       `}</style>
     </div>
   );
-}
+});
 
-export default function Hero() {
-  const [courseIndex, setCourseIndex] = useState(0);
-  const isMobile = useIsMobile();
+/**
+ * ---- Rotating course word ----
+ *
+ * Owns its own interval + state so the 2.2s tick only re-renders this
+ * small leaf node, instead of the entire Hero (shader wrapper, glow
+ * blobs, stats strip, logo carousel) every 2.2 seconds.
+ */
+const RotatingCourseWord = memo(function RotatingCourseWord({ words }) {
+  const [index, setIndex] = useState(0);
 
   useEffect(() => {
     const interval = setInterval(() => {
-      setCourseIndex((prev) => (prev + 1) % ROTATING_COURSES.length);
+      setIndex((prev) => (prev + 1) % words.length);
     }, 2200);
-
     return () => clearInterval(interval);
+  }, [words]);
+
+  return (
+    <span className="text-[#FFDE21] text-3xl sm:text-7xl">
+      <SlotText text={words[index]} options={{ direction: "up", stagger: 40 }} />
+    </span>
+  );
+});
+
+/** Static pill row — memoized since it never depends on Hero's state. */
+const QuickCategories = memo(function QuickCategories() {
+  return (
+    <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
+      {QUICK_CATEGORIES.map(({ label, icon: Icon, href }) => (
+        <Link
+          key={label}
+          to={href}
+          className="group flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10"
+        >
+          <Icon size={13} className="text-[#C4B2FF]" />
+          <span className="text-xs font-medium text-white/80 transition ease-out group-hover:text-white">
+            {label}
+          </span>
+        </Link>
+      ))}
+    </div>
+  );
+});
+
+/** Static stats strip — memoized since it never depends on Hero's state. */
+const StatsStrip = memo(function StatsStrip() {
+  return (
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.3 }}
+      variants={STATS_CONTAINER_VARIANTS}
+      className="mt-10 grid grid-cols-3 gap-3 sm:gap-6"
+    >
+      {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
+        <motion.div
+          key={label}
+          variants={STATS_ITEM_VARIANTS}
+          className="group flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
+        >
+          <Icon
+            size={16}
+            className="text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
+          />
+          <AnimatedStatValue
+            value={value}
+            decimals={decimals}
+            suffix={suffix}
+            className="font-display text-lg font-semibold tabular-nums text-white sm:text-xl"
+          />
+          <span className="text-[10px] uppercase tracking-wide text-white/60 sm:text-xs">
+            {label}
+          </span>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+});
+
+/** Shader background + glow blobs + scrim — isolated so it only re-renders when isMobile flips. */
+const HeroBackground = memo(function HeroBackground({ isMobile }) {
+  return (
+    <>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
+        className="gradient-waves-container absolute inset-0 z-0"
+      >
+        <Suspense fallback={null}>
+          <GradientWaves
+            horizonColor="#5227FF"
+            waveColor="#FF9FFC"
+            crestColor="#FFFFFF"
+            speed={0.4}
+            amplitude={isMobile ? 4 : 2.5}
+            waveScale={isMobile ? 0.9 : 0.6}
+            waveRatio={0.9}
+            swell={isMobile ? 50 : 35}
+            turbulence={isMobile ? 30 : 20}
+            tilt={1.11}
+            zoom={isMobile ? 1.3 : 1}
+            height={isMobile ? 7 : 5.5}
+            fogDepth={isMobile ? 10 : 15}
+            detail={isMobile ? "high" : "medium"}
+            brightness={isMobile ? 1.4 : 1}
+            opacity={1}
+            mouseInteraction
+            parallaxStrength={0.5}
+            grain
+            grainIntensity={0.05}
+          />
+        </Suspense>
+      </motion.div>
+
+      <div
+        className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
+        style={{ background: "radial-gradient(circle, #6C5DD3 0%, transparent 70%)", opacity: 0.35 }}
+      />
+      <div
+        className="pointer-events-none absolute -bottom-52 -right-32 z-[1] h-[600px] w-[600px] rounded-full blur-3xl"
+        style={{ background: "radial-gradient(circle, #8B5CF6 0%, transparent 70%)", opacity: 0.3 }}
+      />
+
+      <div
+        className="pointer-events-none absolute inset-0 z-[2]"
+        style={{ background: isMobile ? SCRIM_MOBILE : SCRIM_DESKTOP }}
+      />
+    </>
+  );
+});
+
+export default function Hero() {
+  const isMobile = useIsMobile();
+
+  // Scroll to the very top whenever the Hero mounts — e.g. when the user
+  // clicks the logo / "Home" in the navbar from somewhere scrolled down on
+  // another page. The documentElement/body fallback covers older/mobile
+  // Safari, where window.scrollTo alone can be unreliable right after a
+  // route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
   }, []);
-
-  // Stagger container + item variants for the stats strip fade-in
-  const statsContainerVariants = {
-    hidden: {},
-    visible: {
-      transition: { staggerChildren: 0.12, delayChildren: 0.1 },
-    },
-  };
-
-  const statsItemVariants = {
-    hidden: { opacity: 0, y: 14 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: { duration: 0.5, ease: "easeOut" },
-    },
-  };
 
   return (
     <>
@@ -233,64 +378,11 @@ export default function Hero() {
         className="relative w-full min-h-screen overflow-hidden"
         style={{ background: "#150A30" }}
       >
-        {/* full-bleed animated background — dark violet palette.
-            Fades in on mount (replaces the old gsap.fromTo opacity tween). */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ duration: 2.2, ease: [0.16, 1, 0.3, 1] }}
-          className="gradient-waves-container absolute inset-0 z-0"
-        >
-          <Suspense fallback={null}>
-            <GradientWaves
-              horizonColor="#5227FF"
-              waveColor="#FF9FFC"
-              crestColor="#FFFFFF"
-              speed={0.4}
-              amplitude={isMobile ? 4 : 2.5}
-              waveScale={isMobile ? 0.9 : 0.6}
-              waveRatio={0.9}
-              swell={isMobile ? 50 : 35}
-              turbulence={isMobile ? 30 : 20}
-              tilt={1.11}
-              zoom={isMobile ? 1.3 : 1}
-              height={isMobile ? 7 : 5.5}
-              fogDepth={isMobile ? 10 : 15}
-              detail={isMobile ? "high" : "medium"}
-              brightness={isMobile ? 1.4 : 1}
-              opacity={1}
-              mouseInteraction
-              parallaxStrength={0.5}
-              grain
-              grainIntensity={0.05}
-            />
-          </Suspense>
-        </motion.div>
-
-        {/* extra violet depth — soft glow blobs, layered above the shader */}
-        <div
-          className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, #6C5DD3 0%, transparent 70%)", opacity: 0.35 }}
-        />
-        <div
-          className="pointer-events-none absolute -bottom-52 -right-32 z-[1] h-[600px] w-[600px] rounded-full blur-3xl"
-          style={{ background: "radial-gradient(circle, #8B5CF6 0%, transparent 70%)", opacity: 0.3 }}
-        />
-
-        {/* readability scrim, subtle, doesn't flatten the wave color */}
-        <div
-          className="pointer-events-none absolute inset-0 z-[2]"
-          style={{
-            background: isMobile
-              ? "linear-gradient(180deg, rgba(10,4,26,0.30) 0%, rgba(10,4,26,0.02) 35%, rgba(10,4,26,0.40) 100%)"
-              : "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)",
-          }}
-        />
+        <HeroBackground isMobile={isMobile} />
 
         {/* content — single straight centered column, no side layout */}
         <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 text-center font-body sm:px-6 sm:py-28">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
-            {/* soft ambient glow behind everything */}
             <span
               aria-hidden
               className="absolute inset-[-6px] rounded-full opacity-40 blur-md animate-[spin_3s_linear_infinite]"
@@ -299,15 +391,12 @@ export default function Hero() {
                   "conic-gradient(from 0deg, transparent 0%, transparent 80%, #c4b5fd 92%, #ffffff 96%, transparent 100%)",
               }}
             />
-            {/* actual pill content */}
             <span className="relative z-10 inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-1.5 text-xs text-white backdrop-blur-md">
               <Star size={12} className="fill-white text-white" />
               Skill OS for the AI era
             </span>
           </span>
 
-          {/* heading with inline animated course name — fades/slides in when
-              it scrolls into view (replaces the old gsap + ScrollTrigger tween) */}
           <motion.h1
             initial={{ opacity: 0, y: 40, filter: "blur(10px)" }}
             whileInView={{ opacity: 1, y: 0, filter: "blur(0px)" }}
@@ -316,14 +405,9 @@ export default function Hero() {
             className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
             <span className="block">LEARN. GET HIRED. GET PAID.</span>
-            <span className="mt-3 flex flex-col items-center justify-center gap-y-2">
+            <span className=" flex flex-col items-center justify-center">
               <span className="font-telma sm:text-7xl text-[#C4B2FF]">Faster With</span>
-              <span className="text-[#FFDE21] text-3xl sm:text-7xl">
-                <SlotText
-                  text={ROTATING_COURSES[courseIndex]}
-                  options={{ direction: "up", stagger: 40 }}
-                />
-              </span>
+              <RotatingCourseWord words={ROTATING_COURSES} />
             </span>
           </motion.h1>
 
@@ -335,57 +419,12 @@ export default function Hero() {
             <Button href="#programs" text="Get skilled now" />
           </div>
 
-          {/* quick category pills — jump straight into a track */}
-          <div className="mt-8 flex flex-wrap items-center justify-center gap-2.5">
-            {QUICK_CATEGORIES.map(({ label, icon: Icon, href }) => (
-              <Link
-                key={label}
-                to={href}
-                className="group flex items-center gap-1.5 rounded-full border border-white/15 bg-white/5 px-4 py-2 backdrop-blur-sm transition hover:border-white/30 hover:bg-white/10"
-              >
-                <Icon size={13} className="text-[#C4B2FF]" />
-                <span className="text-xs font-medium text-white/80 transition ease-out group-hover:text-white">
-                  {label}
-                </span>
-              </Link>
-            ))}
-          </div>
-
-          {/* stats strip — cards fade + rise in staggered, numbers count up from 0 */}
-          <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, amount: 0.3 }}
-            variants={statsContainerVariants}
-            className="mt-10 grid grid-cols-3 gap-3 sm:gap-6"
-          >
-            {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
-              <motion.div
-                key={label}
-                variants={statsItemVariants}
-                className="group flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
-              >
-                <Icon
-                  size={16}
-                  className="text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
-                />
-                <AnimatedStatValue
-                  value={value}
-                  decimals={decimals}
-                  suffix={suffix}
-                  className="font-display text-lg font-semibold tabular-nums text-white sm:text-xl"
-                />
-                <span className="text-[10px] uppercase tracking-wide text-white/60 sm:text-xs">
-                  {label}
-                </span>
-              </motion.div>
-            ))}
-          </motion.div>
+          <QuickCategories />
+          <StatsStrip />
         </div>
       </section>
 
-      {/* Logo strip — sits right under the hero, naturally in the page flow
-          (no fixed-header overlap issue like the standalone test route had) */}
+      {/* Logo strip — sits right under the hero, naturally in the page flow */}
       <section id="programs" className="relative w-full py-3" style={{ background: "#F4F2FA" }}>
         <LogoCarousel />
       </section>

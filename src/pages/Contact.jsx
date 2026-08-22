@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { memo, useCallback, useEffect, useState } from "react";
 import { MapPin, Mail, Phone, Send, Loader2, ArrowRight } from "lucide-react";
 
 /**
@@ -10,7 +10,7 @@ import { MapPin, Mail, Phone, Send, Loader2, ArrowRight } from "lucide-react";
  * Content is unchanged from the previous version — only the structure/finish is upgraded.
  */
 
-const contactPoints = [
+const CONTACT_POINTS = [
   {
     icon: MapPin,
     label: "Head Office",
@@ -36,33 +36,41 @@ const MAP_QUERY = encodeURIComponent(
   "Building No. 532/1, First Floor, Bank Colony Deoli Village, New Delhi-110062"
 );
 
-function scrollToTop() {
+const EMPTY_FORM = { name: "", surname: "", phone: "", email: "", subject: "", message: "" };
+
+// ---- Static style objects, hoisted so they aren't re-allocated on render ----
+
+const heroBlobStyle = { background: "radial-gradient(circle, #6D3FC0 0%, transparent 70%)" };
+const iconTileStyle = { background: "linear-gradient(135deg, #6D3FC0, #E8A33D)" };
+const amberButtonStyle = { background: "linear-gradient(135deg, #F5C878, #E8A33D)" };
+const newsletterBarStyle = { background: "linear-gradient(120deg, #6D3FC0, #2E1A55)" };
+
+const FIELD_CLASS_DARK =
+  "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur-sm transition-colors focus:border-[#E8A33D] focus:ring-2 focus:ring-[#E8A33D]/30";
+const FIELD_CLASS_LIGHT =
+  "w-full rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20";
+
+function scrollToTopSmooth() {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function DotGrid({ className = "", dot = "fill-white/25" }) {
+// Coordinates computed once at module load rather than on every DotGrid render.
+const DOT_GRID_POINTS = Array.from({ length: 7 }, (_, row) =>
+  Array.from({ length: 7 }, (_, col) => ({ cx: 10 + col * 20, cy: 10 + row * 20 }))
+).flat();
+
+const DotGrid = memo(function DotGrid({ className = "", dot = "fill-white/25" }) {
   return (
-    <svg
-      className={className}
-      width="140"
-      height="140"
-      viewBox="0 0 140 140"
-      fill="none"
-      aria-hidden="true"
-    >
-      {Array.from({ length: 7 }).map((_, row) =>
-        Array.from({ length: 7 }).map((_, col) => (
-          <circle key={`${row}-${col}`} cx={10 + col * 20} cy={10 + row * 20} r="2.5" className={dot} />
-        ))
-      )}
+    <svg className={className} width="140" height="140" viewBox="0 0 140 140" fill="none" aria-hidden="true">
+      {DOT_GRID_POINTS.map(({ cx, cy }) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2.5" className={dot} />
+      ))}
     </svg>
   );
-}
+});
 
-function Field({ label, id, type = "text", placeholder, value, onChange, textarea, dark }) {
-  const shared = dark
-    ? "w-full rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white placeholder:text-white/40 outline-none backdrop-blur-sm transition-colors focus:border-[#E8A33D] focus:ring-2 focus:ring-[#E8A33D]/30"
-    : "w-full rounded-xl border border-violet-100 bg-white px-4 py-3 text-sm text-[#1F1533] placeholder:text-[#A79BC4] outline-none transition-colors focus:border-[#6D3FC0] focus:ring-2 focus:ring-[#6D3FC0]/20";
+const Field = memo(function Field({ label, id, type = "text", placeholder, value, onChange, textarea, dark }) {
+  const shared = dark ? FIELD_CLASS_DARK : FIELD_CLASS_LIGHT;
 
   return (
     <div>
@@ -96,46 +104,76 @@ function Field({ label, id, type = "text", placeholder, value, onChange, textare
       )}
     </div>
   );
-}
+});
+
+const ContactPoint = memo(function ContactPoint({ icon: Icon, label, lines }) {
+  return (
+    <div className="flex gap-4">
+      <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl" style={iconTileStyle}>
+        <Icon className="h-5 w-5 text-white" strokeWidth={2} aria-hidden="true" />
+      </div>
+      <div>
+        <p className="font-bold text-white">{label}</p>
+        {lines.map((line) => (
+          <p key={line} className="text-sm leading-relaxed text-white/60">
+            {line}
+          </p>
+        ))}
+      </div>
+    </div>
+  );
+});
 
 export default function ContactSection() {
-  const [form, setForm] = useState({
-    name: "",
-    surname: "",
-    phone: "",
-    email: "",
-    subject: "",
-    message: "",
-  });
+  const [form, setForm] = useState(EMPTY_FORM);
   const [status, setStatus] = useState("idle"); // idle | sending | sent
   const [newsletterEmail, setNewsletterEmail] = useState("");
   const [newsletterStatus, setNewsletterStatus] = useState("idle");
 
-  const handleChange = (e) =>
-    setForm((prev) => ({ ...prev, [e.target.name]: e.target.value }));
+  // Scroll to the very top whenever this page mounts — e.g. when the user
+  // clicks "Contact" in the navbar from somewhere scrolled down on another
+  // page. The documentElement/body fallback covers older/mobile Safari,
+  // where window.scrollTo alone can be unreliable right after a route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
 
-  const handleSubmit = async (e) => {
+  const handleChange = useCallback((e) => {
+    const { name, value } = e.target;
+    setForm((prev) => ({ ...prev, [name]: value }));
+  }, []);
+
+  const handleNewsletterEmailChange = useCallback((e) => {
+    setNewsletterEmail(e.target.value);
+  }, []);
+
+  const handleSubmit = useCallback(async (e) => {
     e.preventDefault();
-    scrollToTop();
+    scrollToTopSmooth();
     setStatus("sending");
     // TODO: wire this up to your actual endpoint / API call
     await new Promise((resolve) => setTimeout(resolve, 900));
     setStatus("sent");
-    setForm({ name: "", surname: "", phone: "", email: "", subject: "", message: "" });
+    setForm(EMPTY_FORM);
     setTimeout(() => setStatus("idle"), 3000);
-  };
+  }, []);
 
-  const handleNewsletter = async (e) => {
-    e.preventDefault();
-    if (!newsletterEmail) return;
-    scrollToTop();
-    setNewsletterStatus("sending");
-    // TODO: wire this up to your actual newsletter endpoint
-    await new Promise((resolve) => setTimeout(resolve, 700));
-    setNewsletterStatus("sent");
-    setNewsletterEmail("");
-    setTimeout(() => setNewsletterStatus("idle"), 3000);
-  };
+  const handleNewsletter = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!newsletterEmail) return;
+      scrollToTopSmooth();
+      setNewsletterStatus("sending");
+      // TODO: wire this up to your actual newsletter endpoint
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      setNewsletterStatus("sent");
+      setNewsletterEmail("");
+      setTimeout(() => setNewsletterStatus("idle"), 3000);
+    },
+    [newsletterEmail]
+  );
 
   return (
     <section className="relative bg-[#F8F6FC] text-[#1F1533]">
@@ -145,9 +183,7 @@ export default function ContactSection() {
         <div
           aria-hidden="true"
           className="pointer-events-none absolute -left-32 top-1/3 h-[380px] w-[380px] rounded-full opacity-40 blur-3xl"
-          style={{
-            background: "radial-gradient(circle, #6D3FC0 0%, transparent 70%)",
-          }}
+          style={heroBlobStyle}
         />
 
         <div className="relative mx-auto max-w-6xl px-6 text-center">
@@ -172,23 +208,8 @@ export default function ContactSection() {
               </p>
 
               <div className="mt-10 space-y-6">
-                {contactPoints.map(({ icon: Icon, label, lines }) => (
-                  <div key={label} className="flex gap-4">
-                    <div
-                      className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
-                      style={{ background: "linear-gradient(135deg, #6D3FC0, #E8A33D)" }}
-                    >
-                      <Icon className="h-5 w-5 text-white" strokeWidth={2} />
-                    </div>
-                    <div>
-                      <p className="font-bold text-white">{label}</p>
-                      {lines.map((line) => (
-                        <p key={line} className="text-sm leading-relaxed text-white/60">
-                          {line}
-                        </p>
-                      ))}
-                    </div>
-                  </div>
+                {CONTACT_POINTS.map((point) => (
+                  <ContactPoint key={point.label} {...point} />
                 ))}
               </div>
             </div>
@@ -228,11 +249,11 @@ export default function ContactSection() {
                   type="submit"
                   disabled={status === "sending"}
                   className="mt-7 inline-flex items-center gap-2 rounded-xl px-6 py-3 text-sm font-semibold text-[#2E1A55] shadow-lg shadow-black/20 transition-transform active:scale-[0.98] disabled:opacity-70"
-                  style={{ background: "linear-gradient(135deg, #F5C878, #E8A33D)" }}
+                  style={amberButtonStyle}
                 >
                   {status === "sending" ? (
                     <>
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
                       Sending…
                     </>
                   ) : status === "sent" ? (
@@ -240,7 +261,7 @@ export default function ContactSection() {
                   ) : (
                     <>
                       Send message
-                      <Send className="h-4 w-4" />
+                      <Send className="h-4 w-4" aria-hidden="true" />
                     </>
                   )}
                 </button>
@@ -267,7 +288,7 @@ export default function ContactSection() {
         <form
           onSubmit={handleNewsletter}
           className="flex flex-col items-center justify-between gap-6 rounded-3xl px-8 py-10 sm:flex-row sm:px-12"
-          style={{ background: "linear-gradient(120deg, #6D3FC0, #2E1A55)" }}
+          style={newsletterBarStyle}
         >
           <div className="text-center sm:text-left">
             <h3 className="text-2xl font-black tracking-tight text-white sm:text-3xl">
@@ -279,28 +300,32 @@ export default function ContactSection() {
           </div>
 
           <div className="flex w-full max-w-md items-center gap-2 rounded-xl bg-white/10 p-1.5 backdrop-blur-sm">
+            <label htmlFor="newsletter-email" className="sr-only">
+              Email address
+            </label>
             <input
+              id="newsletter-email"
               type="email"
               required
               placeholder="Your email address"
               value={newsletterEmail}
-              onChange={(e) => setNewsletterEmail(e.target.value)}
+              onChange={handleNewsletterEmailChange}
               className="w-full bg-transparent px-3 py-2 text-sm text-white placeholder:text-white/50 outline-none"
             />
             <button
               type="submit"
               disabled={newsletterStatus === "sending"}
               className="flex shrink-0 items-center gap-1.5 rounded-lg px-4 py-2 text-sm font-semibold text-[#2E1A55] transition-transform active:scale-[0.97] disabled:opacity-70"
-              style={{ background: "linear-gradient(135deg, #F5C878, #E8A33D)" }}
+              style={amberButtonStyle}
             >
               {newsletterStatus === "sending" ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
               ) : newsletterStatus === "sent" ? (
                 "Done ✓"
               ) : (
                 <>
                   Submit
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 </>
               )}
             </button>

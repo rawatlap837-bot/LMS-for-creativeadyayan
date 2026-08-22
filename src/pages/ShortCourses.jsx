@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
@@ -353,6 +353,17 @@ export default function ShortCourses() {
   const [activeGroup, setActiveGroup] = useState(null);
   const groupRefs = useRef({});
 
+  // Scroll to the very top whenever this page mounts — e.g. when the user
+  // clicks "Short Courses" in the navbar from somewhere scrolled down on
+  // another page. Runs once on mount. The extra document.documentElement /
+  // document.body fallback covers older/mobile Safari, where window.scrollTo
+  // alone can be unreliable right after a route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
+
   const normalizedQuery = query.trim().toLowerCase();
 
   const filteredGroups = useMemo(() => {
@@ -454,11 +465,10 @@ export default function ShortCourses() {
                 key={group.id}
                 type="button"
                 onClick={() => scrollToGroup(group.id)}
-                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[12px] sm:text-[15px] font-semibold transition-all ${
-                  isActive
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3.5 py-1.5 text-[12px] sm:text-[15px] font-semibold transition-all ${isActive
                     ? "border-transparent text-white shadow-md"
                     : "border-violet-100 bg-white text-[#4A3D66] hover:border-violet-200"
-                }`}
+                  }`}
                 style={isActive ? { background: "linear-gradient(135deg, #6D3FC0, #2E1A55)" } : undefined}
               >
                 <GroupIcon className="h-3 w-3" />

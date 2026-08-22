@@ -44,10 +44,16 @@ import {
  *
  * DATA MODEL — matches the admin Courses panel (src/Admin/Courses.jsx):
  *   courses (collection): type ("long" | "short"), title, category,
- *     instructor, icon, color, lessons, duration, price, status
+ *     instructor, icon, color, image, lessons, duration, price, status
  *     ("draft" | "published")
  *   users/{uid}/enrollments (subcollection): saved, purchased,
  *     lessonsDone, progress, status, updatedAt
+ *
+ * `image` is a real photo URL (same idea as the `image` field on the
+ * public Live Courses / Short Courses catalogs) set by the admin per
+ * course. It's optional — older course docs that predate this field, or
+ * ones an admin hasn't added a photo to yet, fall back to the category
+ * icon-on-gradient thumbnail so nothing ever renders blank.
  *
  * Only status === "published" courses reach students — enforced both by
  * the query below AND by Firestore rules, so a draft course an admin is
@@ -82,8 +88,60 @@ function TypeBadge({ type }) {
   );
 }
 
-function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
+/**
+ * CourseThumb — real photo when `course.image` is set (with a shimmer
+ * skeleton while it loads and a silent fallback to the icon tile if the
+ * URL 404s), otherwise the original icon-on-gradient tile. Badges (Done /
+ * Not purchased / Save) are passed in as children so both render paths
+ * share the exact same overlay markup.
+ */
+function CourseThumb({ course, children }) {
   const Icon = ICONS[course.icon] || BookOpen;
+  const [imgFailed, setImgFailed] = useState(false);
+  const [imgLoaded, setImgLoaded] = useState(false);
+  const hasImage = Boolean(course.image) && !imgFailed;
+
+  return (
+    <div className="relative h-28 w-full overflow-hidden sm:h-32">
+      {hasImage ? (
+        <>
+          {!imgLoaded && (
+            <div
+              className="absolute inset-0 animate-pulse"
+              style={{ background: `${course.color}14` }}
+            />
+          )}
+          <img
+            src={course.image}
+            alt={course.title}
+            loading="lazy"
+            onLoad={() => setImgLoaded(true)}
+            onError={() => setImgFailed(true)}
+            className="h-full w-full object-cover"
+            style={{ opacity: !course.purchased ? 0.7 : 1 }}
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/25 via-transparent to-transparent" />
+        </>
+      ) : (
+        <div
+          className="flex h-full w-full items-center justify-center"
+          style={{
+            background: `linear-gradient(150deg, ${course.color}22, ${course.color}0d)`,
+          }}
+        >
+          <Icon
+            className="h-9 w-9 sm:h-10 sm:w-10"
+            style={{ color: course.color, opacity: !course.purchased ? 0.55 : 1 }}
+            strokeWidth={1.6}
+          />
+        </div>
+      )}
+      {children}
+    </div>
+  );
+}
+
+function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
   const isDone = course.status === "Completed";
   const isLocked = !course.purchased;
 
@@ -97,17 +155,7 @@ function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
       className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.03]"
     >
       {/* thumbnail */}
-      <div
-        className="relative flex h-28 items-center justify-center sm:h-32"
-        style={{
-          background: `linear-gradient(150deg, ${course.color}22, ${course.color}0d)`,
-        }}
-      >
-        <Icon
-          className="h-9 w-9 sm:h-10 sm:w-10"
-          style={{ color: course.color, opacity: isLocked ? 0.55 : 1 }}
-          strokeWidth={1.6}
-        />
+      <CourseThumb course={course}>
         {isDone && (
           <span className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-emerald-600 sm:right-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
             <CheckCircle2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
@@ -137,7 +185,7 @@ function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
             )}
           </button>
         )}
-      </div>
+      </CourseThumb>
 
       {/* body */}
       <div className="flex flex-1 flex-col gap-2.5 p-3.5 sm:gap-3 sm:p-4">
@@ -213,7 +261,6 @@ function CourseCard({ course, onOpen, onToggleSave, onBuy }) {
 
 function CourseModal({ course, onClose, onAdvance }) {
   if (!course) return null;
-  const Icon = ICONS[course.icon] || BookOpen;
   const isDone = course.status === "Completed";
 
   return (
@@ -232,11 +279,7 @@ function CourseModal({ course, onClose, onAdvance }) {
         onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-md overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
       >
-        <div
-          className="relative flex h-24 items-center justify-center sm:h-28"
-          style={{ background: `linear-gradient(150deg, ${course.color}30, ${course.color}10)` }}
-        >
-          <Icon className="h-9 w-9 sm:h-10 sm:w-10" style={{ color: course.color }} strokeWidth={1.6} />
+        <CourseThumb course={{ ...course, purchased: true }}>
           <button
             type="button"
             aria-label="Close"
@@ -245,7 +288,7 @@ function CourseModal({ course, onClose, onAdvance }) {
           >
             <X className="h-3.5 w-3.5" />
           </button>
-        </div>
+        </CourseThumb>
         <div className="flex flex-col gap-3 p-4 sm:p-5">
           <div className="min-w-0">
             <p className="mb-1 truncate text-[11px] font-bold uppercase tracking-wide" style={{ color: course.color }}>
@@ -290,7 +333,6 @@ function CourseModal({ course, onClose, onAdvance }) {
 
 function PurchaseModal({ course, status, onClose, onConfirm }) {
   if (!course) return null;
-  const Icon = ICONS[course.icon] || BookOpen;
 
   return (
     <motion.div
@@ -308,21 +350,19 @@ function PurchaseModal({ course, status, onClose, onConfirm }) {
         onClick={(e) => e.stopPropagation()}
         className="max-h-[92vh] w-full max-w-sm overflow-y-auto rounded-t-2xl bg-white shadow-xl sm:rounded-2xl"
       >
-        <div
-          className="relative flex h-20 items-center justify-center sm:h-24"
-          style={{ background: `linear-gradient(150deg, ${course.color}30, ${course.color}10)` }}
-        >
-          <Icon className="h-8 w-8 sm:h-9 sm:w-9" style={{ color: course.color }} strokeWidth={1.6} />
-          {status !== "processing" && (
-            <button
-              type="button"
-              aria-label="Close"
-              onClick={onClose}
-              className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#1B0E3D] active:scale-95"
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          )}
+        <div className="relative h-20 sm:h-24">
+          <CourseThumb course={{ ...course, purchased: true }}>
+            {status !== "processing" && (
+              <button
+                type="button"
+                aria-label="Close"
+                onClick={onClose}
+                className="absolute right-3 top-3 flex h-7 w-7 items-center justify-center rounded-full bg-white/90 text-[#1B0E3D] active:scale-95"
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </CourseThumb>
         </div>
 
         <div className="flex flex-col gap-3.5 p-4 sm:gap-4 sm:p-5">
@@ -444,7 +484,10 @@ export default function MyCourses() {
         ...c,
         // Fallbacks for courses added before icon/price/lessons/instructor
         // existed on every doc — keeps older data from rendering blank.
+        // `image` has no fallback value: it's optional, and CourseThumb
+        // already falls back to the icon tile when it's missing.
         icon: c.icon || iconForCategory(c.category),
+        image: c.image || null,
         price: c.price || DEFAULT_PRICE,
         lessons: c.lessons || estimateLessons(c.duration || ""),
         instructor: c.instructor || DEFAULT_INSTRUCTOR,

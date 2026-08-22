@@ -1,4 +1,4 @@
-import React from "react";
+import React, { memo, useEffect } from "react";
 import { ArrowUpRight, Sparkles, Target, Users2 } from "lucide-react";
 import Sohilsir from "../assets/Images/Sohilsir.jpg";
 import Akashsir from "../assets/Images/Akashsir.jpg";
@@ -13,14 +13,13 @@ import { motion } from "framer-motion";
  * literalizing "guided growth" instead of a generic numbered-step layout.
  */
 
-
-
 const FEATURES = [
   { icon: Target, value: "Day 1", label: "career-ready focus" },
   { icon: Users2, value: "1:1", label: "personalized mentorship" },
   { icon: Sparkles, value: "Hands-on", label: "structured training", hideOnMobile: true },
 ];
-const offerings = [
+
+const OFFERINGS = [
   "IT Courses",
   "Software Training",
   "E-Accounting",
@@ -30,7 +29,7 @@ const offerings = [
   "Career Diplomas",
 ];
 
-const leaders = [
+const LEADERS = [
   {
     name: "Sohil Alvi",
     role: "Director",
@@ -49,29 +48,26 @@ const leaders = [
   },
 ];
 
-function DotGrid({ className = "" }) {
-  return (
-    <svg
-      className={className}
-      width="120"
-      height="120"
-      viewBox="0 0 120 120"
-      fill="none"
-      aria-hidden="true"
-    >
-      {Array.from({ length: 6 }).map((_, row) =>
-        Array.from({ length: 6 }).map((_, col) => (
-          <circle
-            key={`${row}-${col}`}
-            cx={10 + col * 20}
-            cy={10 + row * 20}
-            r="2.5"
-            className="fill-violet-300/60"
-          />
-        ))
-      )}
-    </svg>
-  );
+// ---- Static style objects & handlers, hoisted so they aren't re-allocated ----
+// ---- on every render of the component that uses them. ----
+
+const heroBlobStyle = {
+  background: "radial-gradient(circle at 30% 30%, #C9AFF0 0%, #8B5FE0 45%, transparent 70%)",
+};
+
+const imageWashStyle = {
+  background:
+    "linear-gradient(160deg, rgba(46,26,85,0.35) 0%, rgba(109,63,192,0.05) 55%, transparent 80%)",
+};
+
+const leaderPhotoOverlayStyle = {
+  background: "linear-gradient(to top, rgba(46,26,85,0.55) 0%, rgba(46,26,85,0) 45%)",
+};
+
+// Shared onError handler for both photos — one stable function reference
+// instead of a fresh arrow function allocated per <img> per render.
+function hideBrokenImage(e) {
+  e.currentTarget.style.display = "none";
 }
 
 const featuresContainerVariants = {
@@ -90,17 +86,92 @@ const featuresItemVariants = {
   },
 };
 
+// Coordinates computed once at module load rather than on every DotGrid render.
+const DOT_GRID_POINTS = Array.from({ length: 6 }, (_, row) =>
+  Array.from({ length: 6 }, (_, col) => ({ cx: 10 + col * 20, cy: 10 + row * 20 }))
+).flat();
+
+const DotGrid = memo(function DotGrid({ className = "" }) {
+  return (
+    <svg className={className} width="120" height="120" viewBox="0 0 120 120" fill="none" aria-hidden="true">
+      {DOT_GRID_POINTS.map(({ cx, cy }) => (
+        <circle key={`${cx}-${cy}`} cx={cx} cy={cy} r="2.5" className="fill-violet-300/60" />
+      ))}
+    </svg>
+  );
+});
+
+const FeatureCard = memo(function FeatureCard({ icon: Icon, value, label, hideOnMobile }) {
+  return (
+    <motion.div
+      variants={featuresItemVariants}
+      className={`group rounded-2xl border border-violet-200 bg-white/60 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md hover:shadow-violet-200/50 ${hideOnMobile ? "hidden sm:block" : ""
+        }`}
+    >
+      <div className="flex items-center gap-2 text-[#2E1A55]">
+        <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8A33D]/10 transition-colors duration-300 group-hover:bg-[#E8A33D]/20">
+          <Icon className="h-4 w-4 text-[#E8A33D]" aria-hidden="true" />
+        </span>
+        <span className="text-2xl font-black">{value}</span>
+      </div>
+      <p className="mt-1.5 text-sm text-[#4A3D66]">{label}</p>
+    </motion.div>
+  );
+});
+
+const LeaderCard = memo(function LeaderCard({ leader }) {
+  return (
+    <article className="group relative overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm shadow-violet-900/5 transition-shadow hover:shadow-lg hover:shadow-violet-900/10">
+      {/* photo */}
+      <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55]">
+        <img
+          src={leader.image}
+          alt={leader.name}
+          className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]"
+          loading="lazy"
+          decoding="async"
+          onError={hideBrokenImage}
+        />
+        <div className="pointer-events-none absolute inset-0" style={leaderPhotoOverlayStyle} aria-hidden="true" />
+        <span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#2E1A55] shadow">
+          {leader.years} experience
+        </span>
+      </div>
+
+      {/* content */}
+      <div className="p-8">
+        <h3 className="text-xl font-bold">{leader.name}</h3>
+        <p className="text-sm font-medium text-[#6D3FC0]">{leader.role}</p>
+
+        <p className="mt-4 text-sm leading-relaxed text-[#4A3D66]">{leader.bio}</p>
+
+        <div className="mt-6 flex items-center gap-1.5 text-sm font-medium text-[#2E1A55] opacity-0 transition-opacity group-hover:opacity-100">
+          Focus area: {leader.focus}
+          <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+        </div>
+      </div>
+    </article>
+  );
+});
+
 export default function AboutSection() {
+  // Scroll to the very top whenever this page mounts — e.g. when the user
+  // clicks "About" in the navbar from somewhere scrolled down on another
+  // page. The documentElement/body fallback covers older/mobile Safari,
+  // where window.scrollTo alone can be unreliable right after a route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
+
   return (
     <section className="relative overflow-hidden bg-[#F8F6FC] text-[#1F1533]">
       {/* ambient gradient blob */}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute -right-40 -top-40 h-[520px] w-[520px] rounded-full opacity-70 blur-3xl"
-        style={{
-          background:
-            "radial-gradient(circle at 30% 30%, #C9AFF0 0%, #8B5FE0 45%, transparent 70%)",
-        }}
+        style={heroBlobStyle}
       />
       <DotGrid className="pointer-events-none absolute left-6 top-24 hidden sm:block" />
 
@@ -151,21 +222,14 @@ export default function AboutSection() {
                 alt="Students collaborating at Creative Adhyayan"
                 className="h-full w-full object-cover object-center"
                 loading="lazy"
-                onError={(e) => {
-                  e.currentTarget.style.display = "none";
-                }}
+                decoding="async"
+                onError={hideBrokenImage}
               />
               {/* subtle violet wash to keep the palette consistent over any photo */}
-              <div
-                className="pointer-events-none absolute inset-0 mix-blend-multiply"
-                style={{
-                  background:
-                    "linear-gradient(160deg, rgba(46,26,85,0.35) 0%, rgba(109,63,192,0.05) 55%, transparent 80%)",
-                }}
-              />
+              <div className="pointer-events-none absolute inset-0 mix-blend-multiply" style={imageWashStyle} aria-hidden="true" />
             </div>
             <div className="absolute -bottom-6 -right-6 flex items-center gap-3 rounded-2xl bg-white px-5 py-4 shadow-lg shadow-violet-900/10">
-              <Sparkles className="h-5 w-5 text-[#E8A33D]" />
+              <Sparkles className="h-5 w-5 text-[#E8A33D]" aria-hidden="true" />
               <div>
                 <p className="text-sm font-bold leading-none">Industry-led</p>
                 <p className="mt-1 text-xs text-[#4A3D66]">mentors &amp; curriculum</p>
@@ -195,7 +259,7 @@ export default function AboutSection() {
                 What we offer
               </p>
               <div className="mt-4 flex flex-wrap gap-2">
-                {offerings.map((item) => (
+                {OFFERINGS.map((item) => (
                   <span
                     key={item}
                     className="rounded-full border border-violet-200 bg-white px-4 py-1.5 text-sm font-medium text-[#2E1A55] transition-colors hover:border-[#6D3FC0] hover:bg-violet-50"
@@ -214,21 +278,8 @@ export default function AboutSection() {
               variants={featuresContainerVariants}
               className="mt-10 grid grid-cols-2 gap-4 border-t border-violet-100 pt-8 sm:grid-cols-3 sm:gap-6"
             >
-              {FEATURES.map(({ icon: Icon, value, label, hideOnMobile }) => (
-                <motion.div
-                  key={label}
-                  variants={featuresItemVariants}
-                  className={`group rounded-2xl border border-violet-200 bg-white/60 p-4 backdrop-blur-sm transition-all duration-300 hover:-translate-y-0.5 hover:border-violet-300 hover:shadow-md hover:shadow-violet-200/50 ${hideOnMobile ? "hidden sm:block" : ""
-                    }`}
-                >
-                  <div className="flex items-center gap-2 text-[#2E1A55]">
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#E8A33D]/10 transition-colors duration-300 group-hover:bg-[#E8A33D]/20">
-                      <Icon className="h-4 w-4 text-[#E8A33D]" />
-                    </span>
-                    <span className="text-2xl font-black">{value}</span>
-                  </div>
-                  <p className="mt-1.5 text-sm text-[#4A3D66]">{label}</p>
-                </motion.div>
+              {FEATURES.map((feature) => (
+                <FeatureCard key={feature.label} {...feature} />
               ))}
             </motion.div>
           </div>
@@ -255,60 +306,11 @@ export default function AboutSection() {
               width="100%"
               aria-hidden="true"
             >
-              <line
-                x1="0"
-                y1="1"
-                x2="100%"
-                y2="1"
-                stroke="#D8C9F0"
-                strokeWidth="2"
-                strokeDasharray="6 8"
-              />
+              <line x1="0" y1="1" x2="100%" y2="1" stroke="#D8C9F0" strokeWidth="2" strokeDasharray="6 8" />
             </svg>
 
-            {leaders.map((leader) => (
-              <div
-                key={leader.name}
-                className="group relative overflow-hidden rounded-3xl border border-violet-100 bg-white shadow-sm shadow-violet-900/5 transition-shadow hover:shadow-lg hover:shadow-violet-900/10"
-              >
-                {/* photo */}
-                <div className="relative aspect-[4/3] w-full overflow-hidden bg-gradient-to-br from-[#6D3FC0] to-[#2E1A55]">
-                  <img
-                    src={leader.image}
-                    alt={leader.name}
-                    className="h-full w-full object-cover object-top transition-transform duration-500 group-hover:scale-[1.02]"
-                    loading="lazy"
-                    onError={(e) => {
-                      e.currentTarget.style.display = "none";
-                    }}
-                  />
-                  <div
-                    className="pointer-events-none absolute inset-0"
-                    style={{
-                      background:
-                        "linear-gradient(to top, rgba(46,26,85,0.55) 0%, rgba(46,26,85,0) 45%)",
-                    }}
-                  />
-                  <span className="absolute bottom-4 left-4 rounded-full bg-white/95 px-3 py-1 text-xs font-semibold text-[#2E1A55] shadow">
-                    {leader.years} experience
-                  </span>
-                </div>
-
-                {/* content */}
-                <div className="p-8">
-                  <h3 className="text-xl font-bold">{leader.name}</h3>
-                  <p className="text-sm font-medium text-[#6D3FC0]">{leader.role}</p>
-
-                  <p className="mt-4 text-sm leading-relaxed text-[#4A3D66]">
-                    {leader.bio}
-                  </p>
-
-                  <div className="mt-6 flex items-center gap-1.5 text-sm font-medium text-[#2E1A55] opacity-0 transition-opacity group-hover:opacity-100">
-                    Focus area: {leader.focus}
-                    <ArrowUpRight className="h-4 w-4" />
-                  </div>
-                </div>
-              </div>
+            {LEADERS.map((leader) => (
+              <LeaderCard key={leader.name} leader={leader} />
             ))}
           </div>
         </div>

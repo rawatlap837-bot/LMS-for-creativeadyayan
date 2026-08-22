@@ -120,6 +120,16 @@ export default function LoginForm() {
   const cubesRef = useRef(null);
   const navigate = useNavigate();
 
+  // Scroll to the very top whenever this page mounts — e.g. when the user
+  // clicks "Log in" in the navbar from somewhere scrolled down on another
+  // page. The documentElement/body fallback covers older/mobile Safari,
+  // where window.scrollTo alone can be unreliable right after a route change.
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    document.documentElement.scrollTop = 0;
+    document.body.scrollTop = 0;
+  }, []);
+
   // Pick up the result after returning from Google's redirect flow (mobile
   // path). On desktop this simply resolves to null and does nothing.
   useEffect(() => {

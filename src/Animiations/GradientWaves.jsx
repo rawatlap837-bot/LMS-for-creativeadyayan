@@ -1,5 +1,7 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useMemo, memo } from 'react';
 import { Renderer, Program, Mesh, Triangle } from 'ogl';
+
+/* ---------- helpers (module-level, never recreated on render) ---------- */
 
 const hexToRgb = hex => {
     const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
@@ -12,6 +14,35 @@ const detailToSteps = detail => {
     if (detail === 'high') return 110.0;
     return 70.0;
 };
+
+// Auto-downgrade quality on small / low-power screens so mobile stays smooth.
+// Coarse-pointer (touch) devices are treated as lower-power even when they
+// report a wide viewport (tablets, foldables), since raymarch cost is what
+// actually determines frame time, not layout width.
+const resolveResponsiveDetail = (detail, width, isCoarsePointer) => {
+    if (detail !== 'auto') return detail;
+    if (width < 480) return 'low';
+    if (isCoarsePointer) return width < 1024 ? 'low' : 'medium';
+    if (width < 1280) return 'medium';
+    return 'high';
+};
+
+// DPR cap: full-resolution rendering of a per-pixel raymarch shader is the
+// single biggest mobile cost, so touch devices get a tighter cap than desktop.
+const resolveMaxDpr = (width, isCoarsePointer) => {
+    if (isCoarsePointer) return width < 480 ? 1 : 1.5;
+    return width < 640 ? 1 : 2;
+};
+
+const prefersReducedMotion = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+const isCoarsePointerDevice = () =>
+    typeof window !== 'undefined' &&
+    window.matchMedia &&
+    window.matchMedia('(pointer: coarse)').matches;
 
 const vertex = `#version 300 es
 in vec2 position;
@@ -127,6 +158,29 @@ void main() {
 
 const ctxMap = new WeakMap();
 
+/**
+ * GradientWaves — animated WebGL background.
+ *
+ * Perf/responsive notes:
+ * - Wrapped in React.memo so parent re-renders don't touch the WebGL context.
+ * - detail="auto" (default) picks low/medium/high steps based on viewport width
+ *   AND pointer coarseness, so tablets/foldables that report a wide viewport
+ *   but have weaker GPUs still get downgraded.
+ * - devicePixelRatio is capped harder on coarse-pointer (touch) devices than
+ *   on desktop, since full-res raymarching is the biggest mobile cost.
+ * - On coarse-pointer devices the render loop is capped to ~30fps. A steady
+ *   30fps reads as smoother than an uncapped 60fps that periodically drops
+ *   frames under mobile thermal throttling. Desktop stays uncapped.
+ * - Respects prefers-reduced-motion: renders one static frame instead of animating.
+ * - Resize handling is rAF-throttled and also listens for window resize /
+ *   orientationchange directly, since some mobile browsers don't reliably fire
+ *   ResizeObserver immediately when the address bar shows/hides.
+ * - Pointer listeners are only attached when mouseInteraction is enabled, and
+ *   touch-action is set to none on the canvas only in that case, so parallax
+ *   dragging doesn't fight native scroll when interaction is off (the common
+ *   case for a background layer).
+ * - iResolution/uMouse etc. are typed arrays mutated in place (no per-frame allocation).
+ */
 const GradientWaves = ({
     horizonColor = '#5227FF',
     waveColor = '#FF9FFC',
@@ -141,28 +195,47 @@ const GradientWaves = ({
     zoom = 1.0,
     height = 5.5,
     fogDepth = 15,
-    detail = 'medium',
+    detail = 'auto', // 'low' | 'medium' | 'high' | 'auto'
     brightness = 1.0,
     opacity = 1.0,
     mouseInteraction = true,
     parallaxStrength = 0.5,
     grain = true,
     grainIntensity = 0.05,
+    mobileFrameCap = 30, // fps cap on coarse-pointer devices; set 0 to disable
     className = ''
 }) => {
     const containerRef = useRef(null);
     const enableMouseRef = useRef(mouseInteraction);
+    const detailRef = useRef(detail);
+    detailRef.current = detail;
+    const frameCapRef = useRef(mobileFrameCap);
+    frameCapRef.current = mobileFrameCap;
+
+    // Colors only need to be recomputed when the hex strings actually change.
+    const rgb = useMemo(
+        () => ({
+            horizon: hexToRgb(horizonColor),
+            wave: hexToRgb(waveColor),
+            crest: hexToRgb(crestColor)
+        }),
+        [horizonColor, waveColor, crestColor]
+    );
 
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
+
+        const reduceMotion = prefersReducedMotion();
+        const coarsePointer = isCoarsePointerDevice();
+        const initialWidth = container.getBoundingClientRect().width;
 
         const renderer = new Renderer({
             webgl: 2,
             alpha: true,
             premultipliedAlpha: true,
             antialias: false,
-            dpr: Math.min(window.devicePixelRatio || 1, 2)
+            dpr: Math.min(window.devicePixelRatio || 1, resolveMaxDpr(initialWidth, coarsePointer))
         });
 
         const gl = renderer.gl;
@@ -171,6 +244,10 @@ const GradientWaves = ({
         canvas.style.width = '100%';
         canvas.style.height = '100%';
         canvas.style.display = 'block';
+        if (enableMouseRef.current) {
+            // Prevent touch-drag parallax from fighting native scroll/zoom.
+            canvas.style.touchAction = 'none';
+        }
         container.appendChild(canvas);
 
         const geometry = new Triangle(gl);
@@ -190,7 +267,7 @@ const GradientWaves = ({
                 uZoom: { value: 1.0 },
                 uHeight: { value: 5.5 },
                 uFogDepth: { value: 15 },
-                uSteps: { value: 70.0 },
+                uSteps: { value: detailToSteps(resolveResponsiveDetail(detailRef.current, initialWidth, coarsePointer)) },
                 uBrightness: { value: 1.0 },
                 uOpacity: { value: 1.0 },
                 uGrain: { value: 1.0 },
@@ -207,19 +284,35 @@ const GradientWaves = ({
         const mesh = new Mesh(gl, { geometry, program });
         ctxMap.set(container, { renderer, program, mesh });
 
+        // rAF-throttled resize: ResizeObserver can fire multiple times per frame
+        // during a drag-resize; only the latest size matters.
+        let resizeQueued = false;
         const setSize = () => {
+            resizeQueued = false;
             const rect = container.getBoundingClientRect();
             const w = Math.max(1, Math.floor(rect.width));
             const h = Math.max(1, Math.floor(rect.height));
+            renderer.dpr = Math.min(window.devicePixelRatio || 1, resolveMaxDpr(w, coarsePointer));
             renderer.setSize(w, h);
             const res = program.uniforms.iResolution.value;
             res[0] = gl.drawingBufferWidth;
             res[1] = gl.drawingBufferHeight;
+            program.uniforms.uSteps.value = detailToSteps(resolveResponsiveDetail(detailRef.current, w, coarsePointer));
             renderer.render({ scene: mesh });
         };
+        const queueResize = () => {
+            if (resizeQueued) return;
+            resizeQueued = true;
+            requestAnimationFrame(setSize);
+        };
 
-        const ro = new ResizeObserver(setSize);
+        const ro = new ResizeObserver(queueResize);
         ro.observe(container);
+        // Some mobile browsers (notably older iOS Safari) don't reliably fire
+        // ResizeObserver right away when the address bar shows/hides on scroll
+        // or on orientation change — force a pass in both cases as a backstop.
+        window.addEventListener('resize', queueResize, { passive: true });
+        window.addEventListener('orientationchange', queueResize, { passive: true });
         setSize();
 
         const currentMouse = [0.5, 0.5];
@@ -234,15 +327,39 @@ const GradientWaves = ({
             targetMouse[0] = 0.5;
             targetMouse[1] = 0.5;
         };
-        canvas.addEventListener('pointermove', onPointerMove);
-        canvas.addEventListener('pointerleave', onPointerLeave);
+
+        // Only pay for pointer listeners when interaction is actually enabled.
+        if (enableMouseRef.current) {
+            canvas.addEventListener('pointermove', onPointerMove, { passive: true });
+            canvas.addEventListener('pointerleave', onPointerLeave, { passive: true });
+        }
 
         let raf = 0;
         let isVisible = true;
         let isPageVisible = !document.hidden;
         const t0 = performance.now();
+        let lastFrameTime = 0;
+
+        const renderStaticFrame = () => {
+            program.uniforms.iTime.value = 0;
+            renderer.render({ scene: mesh });
+        };
 
         const loop = t => {
+            // Steady frame-rate cap on coarse-pointer devices: a consistent
+            // lower fps reads smoother than an uncapped rate that stutters
+            // under mobile thermal throttling. Desktop (cap === 0) is uncapped.
+            const cap = coarsePointer ? frameCapRef.current : 0;
+            if (cap > 0) {
+                const interval = 1000 / cap;
+                const elapsed = t - lastFrameTime;
+                if (elapsed < interval) {
+                    raf = requestAnimationFrame(loop);
+                    return;
+                }
+                lastFrameTime = t - (elapsed % interval);
+            }
+
             program.uniforms.iTime.value = (t - t0) * 0.001;
             const tx = enableMouseRef.current ? targetMouse[0] : 0.5;
             const ty = enableMouseRef.current ? targetMouse[1] : 0.5;
@@ -255,6 +372,10 @@ const GradientWaves = ({
         };
 
         const tryStart = () => {
+            if (reduceMotion) {
+                renderStaticFrame();
+                return;
+            }
             if (isVisible && isPageVisible && raf === 0) raf = requestAnimationFrame(loop);
         };
         const tryStop = () => {
@@ -285,17 +406,24 @@ const GradientWaves = ({
             tryStop();
             ro.disconnect();
             io.disconnect();
+            window.removeEventListener('resize', queueResize);
+            window.removeEventListener('orientationchange', queueResize);
             document.removeEventListener('visibilitychange', onVisibility);
             canvas.removeEventListener('pointermove', onPointerMove);
             canvas.removeEventListener('pointerleave', onPointerLeave);
             ctxMap.delete(container);
             try {
                 container.removeChild(canvas);
-            } catch { }
+            } catch {
+                /* already detached */
+            }
             gl.getExtension('WEBGL_lose_context')?.loseContext();
         };
+        // Mount/unmount only — all live tuning happens in the effect below.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
 
+    // Live-update uniforms without touching the WebGL context (cheap effect).
     useEffect(() => {
         const container = containerRef.current;
         if (!container) return;
@@ -316,32 +444,21 @@ const GradientWaves = ({
         u.uZoom.value = zoom;
         u.uHeight.value = height;
         u.uFogDepth.value = fogDepth;
-        u.uSteps.value = detailToSteps(detail);
         u.uBrightness.value = brightness;
         u.uOpacity.value = opacity;
         u.uGrain.value = grain ? 1.0 : 0.0;
         u.uGrainIntensity.value = grainIntensity;
         u.uParallax.value = parallaxStrength;
         u.uEnableMouse.value = mouseInteraction;
+
         const hc = u.uHorizonColor.value;
         const wc = u.uWaveColor.value;
         const cc = u.uCrestColor.value;
-        const h = hexToRgb(horizonColor);
-        const w = hexToRgb(waveColor);
-        const cr = hexToRgb(crestColor);
-        hc[0] = h[0];
-        hc[1] = h[1];
-        hc[2] = h[2];
-        wc[0] = w[0];
-        wc[1] = w[1];
-        wc[2] = w[2];
-        cc[0] = cr[0];
-        cc[1] = cr[1];
-        cc[2] = cr[2];
+        hc[0] = rgb.horizon[0]; hc[1] = rgb.horizon[1]; hc[2] = rgb.horizon[2];
+        wc[0] = rgb.wave[0]; wc[1] = rgb.wave[1]; wc[2] = rgb.wave[2];
+        cc[0] = rgb.crest[0]; cc[1] = rgb.crest[1]; cc[2] = rgb.crest[2];
     }, [
-        horizonColor,
-        waveColor,
-        crestColor,
+        rgb,
         speed,
         amplitude,
         waveScale,
@@ -352,7 +469,6 @@ const GradientWaves = ({
         zoom,
         height,
         fogDepth,
-        detail,
         brightness,
         opacity,
         grain,
@@ -361,7 +477,24 @@ const GradientWaves = ({
         parallaxStrength
     ]);
 
-    return <div ref={containerRef} className={`relative h-full w-full overflow-hidden ${className}`.trim()} />;
+    // Update the responsive detail level (uSteps) if the `detail` prop itself changes.
+    useEffect(() => {
+        const container = containerRef.current;
+        if (!container) return;
+        const ctx = ctxMap.get(container);
+        if (!ctx) return;
+        const width = container.getBoundingClientRect().width;
+        ctx.program.uniforms.uSteps.value = detailToSteps(
+            resolveResponsiveDetail(detail, width, isCoarsePointerDevice())
+        );
+    }, [detail]);
+
+    return (
+        <div
+            ref={containerRef}
+            className={`relative h-full w-full min-h-[200px] overflow-hidden ${className}`.trim()}
+        />
+    );
 };
 
-export default GradientWaves;
+export default memo(GradientWaves);
