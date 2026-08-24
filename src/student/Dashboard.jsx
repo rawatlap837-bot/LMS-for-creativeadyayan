@@ -36,13 +36,11 @@ import {
 /**
  * Dashboard — Creative Adhyayan student home
  *
- * Data is now live from Firestore instead of hardcoded arrays. Expected
+ * Data is live from Firestore instead of hardcoded arrays. Expected
  * collections (create these in Firestore, or point the queries below at
  * your existing ones):
  *
  *   notifications   { uid, title, body, createdAt: Timestamp, read: bool }
- *   assignments     { uid, title, course, priority: "High"|"Medium"|"Low",
- *                      dueDate: Timestamp, status: "pending"|"done" }
  *   scheduleEvents  { uid, date: Timestamp, time: string, label: string }
  *   tasks           { uid, title, duration: string, progress: number (0-100),
  *                      date: Timestamp }   // date = the day the task belongs to
@@ -54,6 +52,10 @@ import {
  * `db` must be exported from ../data/Firebase, e.g.:
  *   import { getFirestore } from "firebase/firestore";
  *   export const db = getFirestore(app);
+ *
+ * NOTE: the Assignments section (and its Firestore listener) has been
+ * removed from this dashboard. Assignments still live at
+ * /dashboard/assignments if you have that route elsewhere.
  */
 
 const ACCENT = "#5227FF";
@@ -173,9 +175,6 @@ export default function Dashboard() {
   const [notifications, setNotifications] = useState([]);
   const [notifLoading, setNotifLoading] = useState(true);
 
-  const [assignments, setAssignments] = useState([]);
-  const [assignmentsLoading, setAssignmentsLoading] = useState(true);
-
   const [tasks, setTasks] = useState([]);
   const [tasksLoading, setTasksLoading] = useState(true);
 
@@ -227,40 +226,6 @@ export default function Dashboard() {
         setNotifLoading(false);
       },
       () => setNotifLoading(false)
-    );
-    return unsub;
-  }, [uid]);
-
-  /* ---- assignments (pending only, soonest due first) ---- */
-  useEffect(() => {
-    if (!uid) return;
-    setAssignmentsLoading(true);
-    const q = query(
-      collection(db, "assignments"),
-      where("uid", "==", uid),
-      where("status", "==", "pending"),
-      orderBy("dueDate", "asc"),
-      limit(5)
-    );
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        setAssignments(
-          snap.docs.map((d) => {
-            const data = d.data();
-            const due = data.dueDate instanceof Timestamp ? data.dueDate.toDate() : null;
-            return {
-              id: d.id,
-              title: data.title,
-              course: data.course,
-              priority: data.priority || "Medium",
-              due: due ? `Due ${due.toLocaleDateString(undefined, { month: "short", day: "numeric" })}` : "No due date",
-            };
-          })
-        );
-        setAssignmentsLoading(false);
-      },
-      () => setAssignmentsLoading(false)
     );
     return unsub;
   }, [uid]);
@@ -553,8 +518,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ================= ROW 2 — notifications / assignments / schedule ================= */}
-      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+      {/* ================= ROW 2 — notifications / schedule ================= */}
+      <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
         {/* notifications */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
           <div className="mb-3 flex items-center justify-between">
@@ -596,53 +561,8 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* assignments */}
-        <motion.div variants={fadeUp} initial="hidden" animate="show" custom={5} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
-          <div className="mb-3 flex items-center justify-between">
-            <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
-              <CalendarClock className="h-4 w-4 text-[#6D3FC0]" />
-              Assignments
-            </h3>
-          </div>
-
-          {assignmentsLoading ? (
-            <p className="py-6 text-center text-xs text-[#A79BC4]">Loading…</p>
-          ) : assignments.length === 0 ? (
-            <p className="py-6 text-center text-xs text-[#A79BC4]">Nothing pending. 🎉</p>
-          ) : (
-            <ul className="space-y-2">
-              {assignments.map((a) => (
-                <li key={a.id} className="rounded-2xl bg-[#F7F5FC] p-3">
-                  <div className="flex items-start justify-between gap-2">
-                    <p className="text-xs font-bold text-[#1B0E3D]">{a.title}</p>
-                    <span
-                      className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold"
-                      style={{
-                        background: a.priority === "High" ? "#FDE8E8" : "#FFF3DE",
-                        color: a.priority === "High" ? "#C0392B" : "#B7791F",
-                      }}
-                    >
-                      {a.priority}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] text-[#8A82A6]">{a.course}</p>
-                  <p className="mt-1 text-[10px] font-semibold text-[#B4ABCB]">{a.due}</p>
-                </li>
-              ))}
-            </ul>
-          )}
-
-          <Link
-            to="/dashboard/assignments"
-            className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-xl border border-violet-100 py-2 text-xs font-bold text-[#6D3FC0] transition-colors hover:bg-violet-50"
-          >
-            View all assignments
-            <ArrowUpRight className="h-3.5 w-3.5" />
-          </Link>
-        </motion.div>
-
         {/* schedule */}
-        <motion.div variants={fadeUp} initial="hidden" animate="show" custom={6} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
+        <motion.div variants={fadeUp} initial="hidden" animate="show" custom={5} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#1B0E3D]">This week</h3>
             <div className="flex items-center gap-1">

@@ -51,7 +51,6 @@ const NAV_ITEMS = [
   { label: "Dashboard", to: "/dashboard", icon: LayoutDashboard, end: true },
   { label: "My Courses", to: "/dashboard/my-courses", icon: BookOpen },
   { label: "Progress", to: "/dashboard/progress", icon: TrendingUp },
-  { label: "Assignments", to: "/dashboard/assignments", icon: ClipboardList },
   { label: "Certificates", to: "/dashboard/certificates", icon: Award },
   { label: "Payments", to: "/dashboard/payments", icon: CreditCard },
   { label: "Profile", to: "/dashboard/profile", icon: UserCircle },
@@ -370,7 +369,9 @@ export default function StudentLayout() {
     }
   }, [navigate]);
 
-  const closeMobileNav = useCallback(() => setMobileOpen(false), []);
+  const closeMobileNav = useCallback(() => {
+    setMobileOpen(false);
+  }, []);
 
   // quick-nav search over the dashboard sections. Swap SEARCH_INDEX below
   // for real course/lesson data once it's available (same {label, to, icon} shape).
@@ -478,54 +479,54 @@ export default function StudentLayout() {
       </motion.aside>
 
       {/* ================= MOBILE DRAWER ================= */}
-      <AnimatePresence>
-        {mobileOpen && (
-          <>
-            <motion.div
-              key="scrim"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.2, ease: EASE }}
-              onClick={closeMobileNav}
-              className="fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden"
-              aria-hidden="true"
-            />
-            <motion.aside
-              key="drawer"
-              role="dialog"
-              aria-modal="true"
-              aria-label="Student navigation"
-              initial={{ x: "-100%" }}
-              animate={{ x: 0 }}
-              exit={{ x: "-100%" }}
-              transition={SPRING}
-              className="fixed inset-y-0 left-0 z-50 w-[72%] max-w-[240px] shadow-2xl shadow-black/30 lg:hidden"
-              style={{ background: SIDEBAR_BG }}
-            >
-              <button
-                type="button"
-                onClick={closeMobileNav}
-                aria-label="Close menu"
-                className="absolute right-3 top-3 z-20 flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:scale-95"
-              >
-                <X className="h-4 w-4" />
-              </button>
-              <div className="relative h-full overflow-hidden">
-                <SidebarGlow />
-                <SidebarContent
-                  collapsed={false}
-                  user={user}
-                  onLogout={handleLogout}
-                  onNavigate={closeMobileNav}
-                  firstLinkRef={drawerFirstLinkRef}
-                />
-              </div>
-            </motion.aside>
-          </>
-        )}
-      </AnimatePresence>
+      {/* Scrim — always mounted; visibility is driven directly by mobileOpen via
+    opacity + pointer-events, not by framer-motion's exit lifecycle. This
+    guarantees the close is synchronous with React state even if an exit
+    animation would otherwise fail to resolve (stale AnimatePresence
+    context from a duplicate framer-motion install, interrupted transitions
+    from rapid toggling, etc). */}
+      <div
+        onClick={() => setMobileOpen(false)}
+        aria-hidden="true"
+        className={`fixed inset-0 z-40 bg-black/40 backdrop-blur-[2px] lg:hidden transition-opacity duration-200 ${mobileOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+          }`}
+        style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+      />
 
+      {/* Drawer — always mounted, transform toggled via class instead of x/exit.
+    `inert` when closed removes its interior nav links/buttons from the tab
+    order and from find-in-page, since they're still in the DOM (just
+    translated off-screen) and would otherwise be reachable by keyboard
+    even while hidden — the old mount/unmount version got this for free. */}
+      <aside
+        role="dialog"
+        aria-modal={mobileOpen}
+        aria-hidden={!mobileOpen}
+        aria-label="Student navigation"
+        {...(!mobileOpen ? { inert: "" } : {})}
+        className={`fixed inset-y-0 left-0 z-50 w-[72%] max-w-[240px] shadow-2xl shadow-black/30 lg:hidden transition-transform duration-300 ${mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        style={{ background: SIDEBAR_BG, transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
+      >
+        <button
+          type="button"
+          onClick={() => setMobileOpen(false)}
+          aria-label="Close menu"
+          className="absolute right-3 top-3 z-[60] flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-white transition-colors hover:bg-white/20 active:scale-95"
+        >
+          <X className="h-4 w-4" />
+        </button>
+        <div className="relative h-full overflow-y-auto overflow-x-hidden">
+          <SidebarGlow />
+          <SidebarContent
+            collapsed={false}
+            user={user}
+            onLogout={handleLogout}
+            onNavigate={closeMobileNav}
+            firstLinkRef={drawerFirstLinkRef}
+          />
+        </div>
+      </aside>
       {/* ================= MAIN COLUMN ================= */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
         {/* topbar */}

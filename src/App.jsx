@@ -20,9 +20,7 @@ const AdminLayout = lazy(() => import('./layouts/AdminLayout.jsx'))
 // Student pages — lazy loaded
 const Dashboard = lazy(() => import('./student/Dashboard.jsx'))
 const MyCourses = lazy(() => import('./student/MyCourses.jsx'))
-const CoursePlayer = lazy(() => import('./student/CoursePlayer.jsx'))
 const Progress = lazy(() => import('./student/Progress.jsx'))
-const Assignments = lazy(() => import('./student/Assignments.jsx'))
 const Certificates = lazy(() => import('./student/Certificates.jsx'))
 const Payments = lazy(() => import('./student/Payments.jsx'))
 const Profile = lazy(() => import('./student/Profile.jsx'))
@@ -61,9 +59,7 @@ function App() {
         >
           <Route index element={<Dashboard />} />
           <Route path="my-courses" element={<MyCourses />} />
-          <Route path="course-player/:courseId" element={<CoursePlayer />} />
           <Route path="progress" element={<Progress />} />
-          <Route path="assignments" element={<Assignments />} />
           <Route path="certificates" element={<Certificates />} />
           <Route path="payments" element={<Payments />} />
           <Route path="profile" element={<Profile />} />

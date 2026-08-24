@@ -1,39 +1,14 @@
 // src/firebase.js
-//
-// Firebase app initialization. Sets up Auth (what Login.jsx needs), Firestore
-// (what the Dashboard needs for live data), Storage (what Assignments.jsx
-// needs for file submissions), and Analytics (optional — only initializes if
-// VITE_FIREBASE_MEASUREMENT_ID is set, since Analytics doesn't work in
-// non-browser/SSR contexts and isn't needed for auth to function).
-//
-// Requires: npm install firebase
-//
-// Reads config from Vite env vars (import.meta.env.VITE_*) rather than
-// hardcoding it, so it's easy to swap configs between environments without
-// touching code. Create a `.env.local` in your project root (same folder as
-// package.json) with:
-//
-//   VITE_FIREBASE_API_KEY=...
-//   VITE_FIREBASE_AUTH_DOMAIN=...
-//   VITE_FIREBASE_PROJECT_ID=...
-//   VITE_FIREBASE_STORAGE_BUCKET=...
-//   VITE_FIREBASE_MESSAGING_SENDER_ID=...
-//   VITE_FIREBASE_APP_ID=...
-//   VITE_FIREBASE_MEASUREMENT_ID=...   (optional, only if using Analytics)
-//
-// All values are in Firebase Console → Project settings → General →
-// "Your apps" → SDK setup and configuration. Vite only exposes env vars
-// prefixed with VITE_ to client code, and .env.local is gitignored by
-// default in Vite projects.
-//
-// Note: `storageBucket` above must be set for the Storage export below to
-// work — it's the same config block, no extra env var needed.
 
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { getFirestore } from "firebase/firestore";
 import { getStorage } from "firebase/storage";
 import { getAnalytics, isSupported } from "firebase/analytics";
+
+// ----------------------------------------------------
+// 1. Firebase Environment Variables
+// ----------------------------------------------------
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -45,20 +20,76 @@ const firebaseConfig = {
   measurementId: import.meta.env.VITE_FIREBASE_MEASUREMENT_ID,
 };
 
+// ----------------------------------------------------
+// 2. Check Required Firebase Configuration
+// ----------------------------------------------------
+
+const requiredFirebaseConfig = {
+  VITE_FIREBASE_API_KEY: firebaseConfig.apiKey,
+  VITE_FIREBASE_AUTH_DOMAIN: firebaseConfig.authDomain,
+  VITE_FIREBASE_PROJECT_ID: firebaseConfig.projectId,
+  VITE_FIREBASE_STORAGE_BUCKET: firebaseConfig.storageBucket,
+  VITE_FIREBASE_MESSAGING_SENDER_ID:
+    firebaseConfig.messagingSenderId,
+  VITE_FIREBASE_APP_ID: firebaseConfig.appId,
+};
+
+const missingVariables = Object.entries(requiredFirebaseConfig)
+  .filter(([, value]) => !value)
+  .map(([key]) => key);
+
+if (missingVariables.length > 0) {
+  throw new Error(
+    `Firebase configuration is incomplete. Missing environment variables:\n${missingVariables.join(
+      "\n"
+    )}`
+  );
+}
+
+// ----------------------------------------------------
+// 3. Initialize Firebase
+// ----------------------------------------------------
+
 const app = initializeApp(firebaseConfig);
 
+// ----------------------------------------------------
+// 4. Firebase Authentication
+// ----------------------------------------------------
+
 export const auth = getAuth(app);
+
+// ----------------------------------------------------
+// 5. Firestore Database
+// ----------------------------------------------------
+
 export const db = getFirestore(app);
+
+// ----------------------------------------------------
+// 6. Firebase Storage
+// ----------------------------------------------------
+
 export const storage = getStorage(app);
 
-// Analytics only runs in a real browser (it checks for things like
-// cookie/indexedDB support), so it's initialized async and guarded rather
-// than called directly at module load.
+// ----------------------------------------------------
+// 7. Firebase Analytics
+// ----------------------------------------------------
+
 export let analytics = null;
+
 if (firebaseConfig.measurementId) {
-  isSupported().then((supported) => {
-    if (supported) analytics = getAnalytics(app);
-  });
+  isSupported()
+    .then((supported) => {
+      if (supported) {
+        analytics = getAnalytics(app);
+      }
+    })
+    .catch((error) => {
+      console.warn("Firebase Analytics could not initialize:", error);
+    });
 }
+
+// ----------------------------------------------------
+// 8. Export Firebase App
+// ----------------------------------------------------
 
 export default app;

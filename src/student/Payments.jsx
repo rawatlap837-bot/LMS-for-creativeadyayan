@@ -7,7 +7,6 @@ import { auth, db } from "../firebase/Firebase"; // adjust path to match your pr
 import { CreditCard, CheckCircle2, IndianRupee, Loader2, ShieldCheck } from "lucide-react";
 
 const ACCENT = "#5227FF";
-const AMBER = "#E8A33D";
 const VIOLET = "#2E1A55";
 const cardShadow = "shadow-lg shadow-violet-900/[0.06]";
 
@@ -29,6 +28,11 @@ function loadRazorpayScript() {
     document.body.appendChild(script);
   });
   return razorpayScriptPromise;
+}
+
+function formatDate(d) {
+  if (!d) return "—";
+  return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
 export default function Payments() {
@@ -82,7 +86,7 @@ export default function Payments() {
     return unsub;
   }, [uid]);
 
-  /* payment history */
+  /* purchased courses history — just the paid rows, newest first */
   useEffect(() => {
     if (!uid) return;
     setHistoryLoading(true);
@@ -93,7 +97,7 @@ export default function Payments() {
         const rows = snap.docs.map((d) => {
           const data = d.data();
           const paidAt = data.paidAt?.toDate ? data.paidAt.toDate() : null;
-          return { id: d.id, ...data, paidAt };
+          return { id: d.id, courseName: data.courseName, amount: data.amount, paidAt };
         });
         rows.sort((a, b) => (b.paidAt || 0) - (a.paidAt || 0));
         setHistory(rows);
@@ -145,10 +149,10 @@ export default function Payments() {
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_signature: response.razorpay_signature,
             });
-            // enrollments listener above will flip this course to "Enrolled" automatically
+            // enrollments + history listeners above pick this up automatically
           } catch (err) {
             console.error(err);
-            setError("Payment verification failed. If money was deducted, it will be refunded — contact support with your payment ID.");
+            setError("Payment verification failed. If money was deducted, it will be refunded — contact support.");
           } finally {
             setPayingId(null);
           }
@@ -253,16 +257,16 @@ export default function Payments() {
         )}
       </motion.div>
 
-      {/* payment history */}
+      {/* purchased courses history — just course, date, amount */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={8} className="mt-8">
-        <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Payment history</h3>
+        <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Purchased courses</h3>
         {historyLoading ? (
           <div className={`rounded-3xl bg-white p-6 text-center ${cardShadow}`}>
             <p className="text-xs text-[#A79BC4]">Loading…</p>
           </div>
         ) : history.length === 0 ? (
           <div className={`rounded-3xl bg-white p-6 text-center ${cardShadow}`}>
-            <p className="text-xs text-[#A79BC4]">No payments yet.</p>
+            <p className="text-xs text-[#A79BC4]">No courses purchased yet.</p>
           </div>
         ) : (
           <div className={`overflow-hidden rounded-3xl bg-white ${cardShadow}`}>
@@ -273,11 +277,7 @@ export default function Payments() {
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-bold text-[#1B0E3D]">{p.courseName}</p>
-                  <p className="mt-0.5 text-[10px] text-[#8A82A6]">
-                    {p.paidAt ? p.paidAt.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" }) : "—"}
-                    {" · "}
-                    {p.razorpayPaymentId}
-                  </p>
+                  <p className="mt-0.5 text-[10px] text-[#8A82A6]">{formatDate(p.paidAt)}</p>
                 </div>
                 <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-[#1B0E3D]">
                   <IndianRupee className="h-3 w-3" />
