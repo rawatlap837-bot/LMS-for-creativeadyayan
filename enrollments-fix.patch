@@ -1,0 +1,205 @@
+diff --git a/src/student/Certificates.jsx b/src/student/Certificates.jsx
+index 8355ece..5016782 100644
+--- a/src/student/Certificates.jsx
++++ b/src/student/Certificates.jsx
+@@ -56,24 +56,59 @@ export default function Certificates() {
+     return unsub;
+   }, [uid]);
+ 
+-  /* courses still in progress (< 100%) so users can see what's left to unlock */
++  /* courses still in progress (< 100%) so users can see what's left to unlock
++   * Enrollment docs (users/{uid}/enrollments/{courseId}) don't store the
++   * course name, so we join against the courses collection for display. */
+   useEffect(() => {
+     if (!uid) return;
+     setProgressLoading(true);
+-    const q = query(collection(db, "enrollments"), where("uid", "==", uid));
+-    const unsub = onSnapshot(
+-      q,
++    let enrollmentDocs = [];
++    let catalogCourses = [];
++    let gotEnrollments = false;
++    let gotCatalog = false;
++
++    const buildInProgress = () => {
++      if (!gotEnrollments || !gotCatalog) return;
++      const catalogById = new Map(catalogCourses.map((c) => [c.id, c]));
++      setInProgress(
++        enrollmentDocs
++          .filter((e) => e.purchased && (e.progress ?? 0) < 100)
++          .map((e) => ({
++            ...e,
++            courseName: catalogById.get(e.id)?.title || "Untitled course",
++          }))
++      );
++      setProgressLoading(false);
++    };
++
++    const unsubEnroll = onSnapshot(
++      collection(db, "users", uid, "enrollments"),
+       (snap) => {
+-        setInProgress(
+-          snap.docs
+-            .map((d) => ({ id: d.id, ...d.data() }))
+-            .filter((e) => (e.progress ?? 0) < 100)
+-        );
+-        setProgressLoading(false);
++        enrollmentDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
++        gotEnrollments = true;
++        buildInProgress();
+       },
+-      () => setProgressLoading(false)
++      () => {
++        gotEnrollments = true;
++        buildInProgress();
++      }
+     );
+-    return unsub;
++    const unsubCatalog = onSnapshot(
++      collection(db, "courses"),
++      (snap) => {
++        catalogCourses = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
++        gotCatalog = true;
++        buildInProgress();
++      },
++      () => {
++        gotCatalog = true;
++        buildInProgress();
++      }
++    );
++    return () => {
++      unsubEnroll();
++      unsubCatalog();
++    };
+   }, [uid]);
+ 
+   const handleDownload = (cert) => {
+diff --git a/src/student/Dashboard.jsx b/src/student/Dashboard.jsx
+index 625bac6..b4598e0 100644
+--- a/src/student/Dashboard.jsx
++++ b/src/student/Dashboard.jsx
+@@ -341,30 +341,66 @@ export default function Dashboard() {
+     return map;
+   }, [scheduleEvents]);
+ 
+-  /* ---- course progress ---- */
++  /* ---- course progress ----
++   * Enrollment docs live at users/{uid}/enrollments/{courseId} and only
++   * store progress/purchased/saved — no course name or color. Those live
++   * on the courses/{courseId} doc, so we join the two collections here
++   * the same way MyCourses.jsx does. */
+   useEffect(() => {
+     if (!uid) return;
+     setCoursesLoading(true);
+-    const q = query(collection(db, "enrollments"), where("uid", "==", uid), limit(4));
+-    const unsub = onSnapshot(
+-      q,
++    let enrollmentDocs = [];
++    let catalogCourses = [];
++    let gotEnrollments = false;
++    let gotCatalog = false;
++
++    const buildCourses = () => {
++      if (!gotEnrollments || !gotCatalog) return;
++      const catalogById = new Map(catalogCourses.map((c) => [c.id, c]));
++      const joined = enrollmentDocs
++        .filter((e) => e.purchased)
++        .map((e, i) => {
++          const course = catalogById.get(e.id);
++          return {
++            id: e.id,
++            label: course?.title || "Untitled course",
++            value: e.progress ?? 0,
++            color: course?.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
++          };
++        })
++        .slice(0, 4);
++      setCourses(joined);
++      setCoursesLoading(false);
++    };
++
++    const unsubEnroll = onSnapshot(
++      collection(db, "users", uid, "enrollments"),
+       (snap) => {
+-        setCourses(
+-          snap.docs.map((d, i) => {
+-            const data = d.data();
+-            return {
+-              id: d.id,
+-              label: data.courseName,
+-              value: data.progress ?? 0,
+-              color: data.color || FALLBACK_COLORS[i % FALLBACK_COLORS.length],
+-            };
+-          })
+-        );
+-        setCoursesLoading(false);
++        enrollmentDocs = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
++        gotEnrollments = true;
++        buildCourses();
+       },
+-      () => setCoursesLoading(false)
++      () => {
++        gotEnrollments = true;
++        buildCourses();
++      }
+     );
+-    return unsub;
++    const unsubCatalog = onSnapshot(
++      collection(db, "courses"),
++      (snap) => {
++        catalogCourses = snap.docs.map((d) => ({ id: d.id, ...d.data() }));
++        gotCatalog = true;
++        buildCourses();
++      },
++      () => {
++        gotCatalog = true;
++        buildCourses();
++      }
++    );
++    return () => {
++      unsubEnroll();
++      unsubCatalog();
++    };
+   }, [uid]);
+ 
+   /* ---- next live class ---- */
+diff --git a/src/student/Payments.jsx b/src/student/Payments.jsx
+index d48288c..8a3c8c6 100644
+--- a/src/student/Payments.jsx
++++ b/src/student/Payments.jsx
+@@ -72,12 +72,15 @@ export default function Payments() {
+     return unsub;
+   }, []);
+ 
+-  /* which of those the user already owns */
++  /* which of those the user already owns
++   * Enrollment docs live at users/{uid}/enrollments/{courseId} — the doc
++   * ID *is* the courseId, it's not stored as a field on the doc. */
+   useEffect(() => {
+     if (!uid) return;
+-    const q = query(collection(db, "enrollments"), where("uid", "==", uid));
+-    const unsub = onSnapshot(q, (snap) => {
+-      setEnrolledIds(new Set(snap.docs.map((d) => d.data().courseId)));
++    const unsub = onSnapshot(collection(db, "users", uid, "enrollments"), (snap) => {
++      setEnrolledIds(
++        new Set(snap.docs.filter((d) => d.data().purchased).map((d) => d.id))
++      );
+     });
+     return unsub;
+   }, [uid]);
+diff --git a/src/student/Profile.jsx b/src/student/Profile.jsx
+index 71ce3ec..ecee1c9 100644
+--- a/src/student/Profile.jsx
++++ b/src/student/Profile.jsx
+@@ -73,8 +73,8 @@ export default function Profile() {
+   /* live stats */
+   useEffect(() => {
+     if (!uid) return;
+-    const unsubEnroll = onSnap(query(collection(db, "enrollments"), where("uid", "==", uid)), (snap) =>
+-      setCourseCount(snap.size)
++    const unsubEnroll = onSnap(collection(db, "users", uid, "enrollments"), (snap) =>
++      setCourseCount(snap.docs.filter((d) => d.data().purchased).length)
+     );
+     const unsubCerts = onSnap(query(collection(db, "certificates"), where("uid", "==", uid)), (snap) =>
+       setCertCount(snap.size)
+       
