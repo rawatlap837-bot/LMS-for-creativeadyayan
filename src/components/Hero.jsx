@@ -20,6 +20,7 @@ import {
   BookOpen,
   Users,
   Award,
+  PlayCircle,
 } from "lucide-react";
 import "slot-text/style.css";
 import { SlotText } from "slot-text/react";
@@ -40,7 +41,7 @@ const GradientWaves = lazy(() => import("../Animiations/GradientWaves"));
 
 const ROTATING_COURSES = [
   "Digital Marketing",
-  "Software Development",
+  "Programming",
   "Web Development",
   "Artificial Intelligence",
 ];
@@ -53,11 +54,96 @@ const QUICK_CATEGORIES = [
 ];
 
 const STATS = [
-  { icon: BookOpen, value: 24, label: "Courses" },
+  { icon: BookOpen, value: 50, suffix: "+", label: "Courses" },
   { icon: Users, value: 12000, suffix: "+", label: "Learners" },
   { icon: Award, value: 4.8, decimals: 1, suffix: " / 5", label: "Avg. rating" },
 ];
 
+/**
+ * ---- Fanned card stack (bottom of hero) ----
+ *
+ * One raised, oversized card in the center, flanked by shorter
+ * cards that rotate away and recede in z-order — same composition
+ * as the reference screenshot, just themed to the hero's own
+ * palette instead of introducing new colors.
+ *
+ * Each entry is a placeholder gradient tile for now. Swap `render`
+ * for an <img src={...} className="h-full w-full object-cover" />
+ * once you have real artwork — everything else (size, rotation,
+ * stacking, motion) stays the same.
+ */
+// offsetY is tiered: outer cards drop lowest, the two cards next to
+// center sit higher, and the featured (center) card drops by 10% of
+// its own height so its bottom edge crops against the container.
+const FAN_CARDS = [
+  { id: "c1", from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 65, z: 10 },
+  { id: "c2", from: "#A78BFA", to: "#5B21B6", rotate: -8, offsetY: 10, z: 20 },
+  { id: "c3", from: "#C4B2FF", to: "#6C5DD3", rotate: 0, offsetY: "10%", z: 40, featured: true },
+  { id: "c4", from: "#8B5CF6", to: "#4338CA", rotate: 8, offsetY: 10, z: 20 },
+  { id: "c5", from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 65, z: 10 },
+];
+const FAN_CONTAINER_VARIANTS = {
+  hidden: {},
+  visible: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } },
+};
+
+const FAN_CARD_VARIANTS = {
+  hidden: { opacity: 0, y: 60, rotate: 0, scale: 0.5 },
+  visible: (c) => ({
+    opacity: 1,
+    y: c.offsetY,
+    rotate: c.rotate,
+    scale: 1,
+    transition: { duration: 0.9, ease: [0.16, 1, 0.3, 1] },
+  }),
+};
+
+const ImageCardFan = memo(function ImageCardFan({ cards = FAN_CARDS }) {
+  return (
+    <motion.div
+      initial="hidden"
+      whileInView="visible"
+      viewport={{ once: true, amount: 0.4 }}
+      variants={FAN_CONTAINER_VARIANTS}
+      className="relative mt-12 flex w-full items-end justify-center sm:mt-5"
+    >
+      {cards.map((c, i) => (
+        <motion.div
+          key={c.id}
+          custom={c}
+          variants={FAN_CARD_VARIANTS}
+          whileHover={{
+            y: -3,
+            scale: c.featured ? 1.008 : 1.005,
+            transition: { duration: 0.25, ease: "easeOut" },
+          }}
+          style={{
+            zIndex: c.z,
+            marginLeft: i === 0 ? 0 : "clamp(-60px, -6vw, -26px)",
+            width: c.featured
+              ? "clamp(118px, 25vw, 320px)"
+              : "clamp(88px, 18vw, 245px)",
+            height: c.featured
+              ? "clamp(178px, 36vw, 445px)"
+              : "clamp(132px, 27vw, 345px)",
+            background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
+          }}
+          className="relative flex-none origin-bottom overflow-hidden rounded-[16px] border border-white/15 shadow-[0_24px_52px_-13px_rgba(10,4,26,0.7)] sm:rounded-[28px]"
+        >
+          {/*
+            Placeholder tile — replace this whole block with:
+            <img src={c.src} alt="" className="h-full w-full object-cover" draggable={false} />
+          */}
+          <div className="flex h-full w-full items-center justify-center">
+            <span className="text-[10px] uppercase tracking-wide text-white/50 sm:text-sm">
+              image
+            </span>
+          </div>
+        </motion.div>
+      ))}
+    </motion.div>
+  );
+});
 // Hoisted outside the component so these plain objects aren't
 // re-created (and don't trigger new prop identities) on every render.
 const STATS_CONTAINER_VARIANTS = {
@@ -244,7 +330,7 @@ const RotatingCourseWord = memo(function RotatingCourseWord({ words }) {
   }, [words]);
 
   return (
-    <span className="text-[#FFDE21] text-3xl sm:text-7xl">
+    <span className="text-[#FFDE21] text-3xl sm:text-6xl">
       <SlotText text={words[index]} options={{ direction: "up", stagger: 40 }} />
     </span>
   );
@@ -278,7 +364,7 @@ const StatsStrip = memo(function StatsStrip() {
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       variants={STATS_CONTAINER_VARIANTS}
-      className="mt-10 grid grid-cols-3 gap-3 sm:gap-6"
+      className="mt-3 grid grid-cols-3 gap-3 sm:gap-6"
     >
       {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
         <motion.div
@@ -382,7 +468,7 @@ export default function Hero() {
         <HeroBackground isMobile={isMobile} />
 
         {/* content — single straight centered column, no side layout */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 text-center font-body sm:px-6 sm:py-28">
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 pb-20 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
             <span
               aria-hidden
@@ -405,28 +491,46 @@ export default function Hero() {
             transition={{ duration: 1.6, ease: [0.16, 1, 0.3, 1] }}
             className="mt-6 text-center font-pliant text-[40px] font-semibold leading-[1.08] tracking-tight text-white sm:text-7xl"
           >
-            <span className="block">LEARN. GET HIRED. GET PAID.</span>
+            <span className="block">Learn. Get Hired. Get Paid.</span>
             <span className="flex flex-col items-center justify-center">
-              <span className="font-telma text-3xl sm:text-7xl text-[#C4B2FF] leading-none">
-                Faster With
-              </span>
-              <span className="-mt-1 sm:-mt-3">
+              <span className="font-pliant mt-2.5 mb-5 inline-flex flex-wrap items-baseline justify-center gap-x-3 text-3xl sm:text-6xl text-[#C4B2FF] leading-none">
+                <span>Faster With</span>
                 <RotatingCourseWord words={ROTATING_COURSES} />
               </span>
             </span>
           </motion.h1>
           <StatsStrip />
           <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
-            <Button href="#programs" text="Get skilled now" />
+            <Button href="#programs" text="Explore Courses" />
+            <motion.a
+              href="#demo"
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
+              transition={{ type: "spring", stiffness: 400, damping: 25 }}
+              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/25 bg-white/5 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-colors duration-300 hover:border-white/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4B2FF]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150A30]"
+            >
+              {/* soft sheen sweep on hover */}
+              <span
+                aria-hidden
+                className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
+              />
+              <PlayCircle
+                size={20}
+                className="relative text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
+              />
+              <span className="relative">Watch Demo</span>
+            </motion.a>
           </div>
 
+          <ImageCardFan />
         </div>
-      </section>
+      </section >
 
       {/* Logo strip — sits right under the hero, naturally in the page flow */}
-      <section id="programs" className="relative w-full py-3" style={{ background: "#F4F2FA" }}>
+      < section id="programs" className="relative w-full py-3" style={{ background: "#F4F2FA" }
+      }>
         <LogoCarousel />
-      </section>
+      </section >
     </>
   );
 }

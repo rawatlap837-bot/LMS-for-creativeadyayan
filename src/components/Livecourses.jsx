@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { motion, AnimatePresence, useMotionValue, useSpring, useReducedMotion } from "framer-motion";
-import { CheckCircle2, Clock, ArrowUpRight, Heart, BookOpen, Layers } from "lucide-react";
+import { CheckCircle2, Clock, ArrowUpRight, Heart, BookOpen, Layers, ChevronDown } from "lucide-react";
 import {
     CATEGORY_ICONS,
     TRUST_POINTS,
@@ -138,8 +138,8 @@ function CategoryTabs({ categories, activeIndex, onSelect, counts }) {
                         onClick={() => onSelect(i)}
                         onKeyDown={(e) => handleKeyDown(e, i)}
                         className={`relative flex shrink-0 items-center gap-1.5 rounded-full px-4 py-2.5 text-xs font-semibold tracking-tight outline-none transition-colors duration-300 focus-visible:ring-2 focus-visible:ring-[#5227FF] focus-visible:ring-offset-2 sm:px-5 sm:py-3 sm:text-sm ${isActive
-                                ? "text-white"
-                                : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300"
+                            ? "text-white"
+                            : "border border-violet-200 bg-white text-[#1B0E3D] hover:border-violet-300"
                             }`}
                     >
                         {isActive && (
@@ -286,10 +286,14 @@ function CourseMedia({ images, title, duration, saved, onToggleSave }) {
 const FEATURES_PREVIEW_COUNT = 3;
 
 function CourseCard({ course, category, index, saved, onToggleSave }) {
-    const extraFeatureCount = Math.max(
-        0,
-        (course.features?.length ?? 0) - FEATURES_PREVIEW_COUNT
-    );
+    const allFeatures = course.features ?? [];
+    const extraFeatureCount = Math.max(0, allFeatures.length - FEATURES_PREVIEW_COUNT);
+
+    // "+N more" toggles between the short preview list and the full list,
+    // in place, without navigating anywhere — this used to be a static,
+    // non-interactive <li>.
+    const [showAllFeatures, setShowAllFeatures] = useState(false);
+    const visibleFeatures = showAllFeatures ? allFeatures : allFeatures.slice(0, FEATURES_PREVIEW_COUNT);
 
     // Where this card's CTA sends people. Prefer an explicit `course.link`
     // set in LiveCoursesData.js; otherwise fall back to the app's real
@@ -377,20 +381,48 @@ function CourseCard({ course, category, index, saved, onToggleSave }) {
                     </p>
                 )}
 
-                {course.features?.length > 0 && (
+                {allFeatures.length > 0 && (
                     <ul className="mt-4 space-y-2 border-t border-violet-50 pt-4">
-                        {course.features.slice(0, FEATURES_PREVIEW_COUNT).map((feature) => (
-                            <li key={feature} className="flex items-start gap-2 text-[13px] text-slate-600">
+                        {visibleFeatures.map((feature) => (
+                            <motion.li
+                                key={feature}
+                                initial={false}
+                                animate={{ opacity: 1 }}
+                                className="flex items-start gap-2 text-[13px] text-slate-600"
+                            >
                                 <span className="mt-0.5 flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full bg-violet-100">
                                     <CheckCircle2 className="h-3 w-3 text-[#5227FF]" strokeWidth={3} />
                                 </span>
                                 <span className="leading-snug">{feature}</span>
-                            </li>
+                            </motion.li>
                         ))}
                         {extraFeatureCount > 0 && (
-                            <li className="flex items-center gap-2 pl-6 text-xs font-semibold text-[#5227FF]">
-                                <Layers className="h-3.5 w-3.5" strokeWidth={2.5} />
-                                +{extraFeatureCount} more benefit{extraFeatureCount > 1 ? "s" : ""}
+                            <li>
+                                <button
+                                    type="button"
+                                    onClick={(e) => {
+                                        // Stop this from bubbling up into the card's
+                                        // <Link> wrapper and navigating away — this
+                                        // toggle should only expand the list in place.
+                                        e.preventDefault();
+                                        e.stopPropagation();
+                                        setShowAllFeatures((prev) => !prev);
+                                    }}
+                                    aria-expanded={showAllFeatures}
+                                    className="flex w-full items-center gap-2 rounded-md pl-6 text-xs font-semibold text-[#5227FF] outline-none transition-colors duration-150 hover:text-[#1B0E3D] focus-visible:ring-2 focus-visible:ring-[#5227FF]"
+                                >
+                                    <Layers className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} />
+                                    <span>
+                                        {showAllFeatures
+                                            ? "Show less"
+                                            : `+${extraFeatureCount} more benefit${extraFeatureCount > 1 ? "s" : ""}`}
+                                    </span>
+                                    <ChevronDown
+                                        className={`h-3.5 w-3.5 shrink-0 transition-transform duration-200 ${showAllFeatures ? "rotate-180" : ""
+                                            }`}
+                                        strokeWidth={2.5}
+                                    />
+                                </button>
                             </li>
                         )}
                     </ul>
@@ -439,7 +471,7 @@ export default function LiveCourses({
     categories = DEFAULT_CATEGORIES,
     coursesByCategory = DEFAULT_COURSES_BY_CATEGORY,
     eyebrow = "Our Programs",
-    title = "Live Courses",
+    title = "Our Courses",
     subtitle = "Real-Time Learning With Lifetime Access.",
     exploreAllHref,
 }) {

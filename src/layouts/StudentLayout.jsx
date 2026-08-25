@@ -2,7 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Outlet, NavLink, useNavigate, useLocation } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged, signOut } from "firebase/auth";
-import { auth } from "../firebase/Firebase";
+import { collection, onSnapshot, query, where, orderBy, doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "../firebase/Firebase";
 import CA2Logo from "../assets/Images/CA2.png";
 import {
   LayoutDashboard,
@@ -21,20 +22,34 @@ import {
   Settings,
   ChevronDown,
   AlertCircle,
+  Flame,
+  PlayCircle,
+  Sparkles,
 } from "lucide-react";
 
 /**
  * StudentLayout — Creative Adhyayan
- * Dark violet sidebar (same gradient/canvas tokens as the site Navbar:
- * #2C1A5E → #1B0E3D on #ECEEF3) with a collapsible rail, an animated
- * sliding active-indicator (framer-motion layoutId), and a mobile drawer
- * that mirrors the Navbar's slide/fade pattern. Topbar carries a greeting,
- * search, notifications, and an account menu wired to Firebase auth.
  *
- * Motion system: layout/panel transitions use springs (stiffness 500 /
- * damping 38–40) for a snappy, consistent "settle" feel; simple
- * fade/slide reveals use the same eased curve ([0.16, 1, 0.3, 1]) used
- * elsewhere on the site, so nothing feels like a different hand built it.
+ * v2 — same violet/amber identity, but the shell now carries live signal
+ * instead of being purely decorative:
+ *   - Sidebar footer shows a real progress ring (overall course completion)
+ *     driven by /users/{uid} enrollment data, with a streak flame.
+ *   - Topbar gets a "continue learning" strip that surfaces the most
+ *     recently-touched in-progress course and resumes it in one click.
+ *   - Search is now a real command palette (⌘K): it indexes nav routes,
+ *     quick actions, AND live course titles from Firestore, with fuzzy
+ *     substring matching and full keyboard nav.
+ *   - Notifications are individually clickable (mark-as-read + navigate),
+ *     backed by Firestore where available and gracefully falling back to
+ *     an empty state otherwise.
+ *
+ * Firestore shape assumed (swap paths as needed for your schema):
+ *   users/{uid}                       -> { streakDays, coursesEnrolled, coursesCompleted }
+ *   users/{uid}/enrollments/{id}      -> { courseTitle, progressPct, lastAccessedAt, courseId }
+ *   users/{uid}/notifications/{id}    -> { title, body, read, createdAt, link }
+ *
+ * If `db` isn't wired up yet, every live hook below fails soft into empty
+ * arrays/zeroed stats — nothing crashes, the UI just shows its empty state.
  */
 
 const CANVAS = "#ECEEF3";
@@ -56,6 +71,20 @@ const NAV_ITEMS = [
   { label: "Profile", to: "/dashboard/profile", icon: UserCircle },
 ];
 
+// Extra palette entries the command bar can jump to that aren't nav links.
+function buildQuickActions({ onLogout, onToggleCollapse, collapsed }) {
+  return [
+    { label: "Log out", to: null, icon: LogOut, action: onLogout, group: "Actions" },
+    {
+      label: collapsed ? "Expand sidebar" : "Collapse sidebar",
+      to: null,
+      icon: ChevronsLeft,
+      action: onToggleCollapse,
+      group: "Actions",
+    },
+  ];
+}
+
 function initialsFrom(name, email) {
   const source = (name || email || "?").trim();
   if (!source) return "?";
@@ -70,9 +99,127 @@ function greetingForHour(hour) {
   return "Good evening";
 }
 
-/** Soft ambient glow behind the sidebar content — same "living gradient"
- *  language as the site's AmbientBackground blobs, scaled down for a
- *  260px rail. Purely decorative, so it's aria-hidden. */
+function timeAgo(date) {
+  if (!date) return "";
+  const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  if (seconds < 60) return "just now";
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
+
+/* ------------------------------------------------------------------
+   Live data hooks — each fails soft (empty/default state) if the
+   collection doesn't exist yet or the user is signed out, so the shell
+   is safe to ship ahead of the backend catching up.
+------------------------------------------------------------------- */
+
+function useEnrollments(uid) {
+  const [enrollments, setEnrollments] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!uid || !db) {
+      setEnrollments([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const q = query(
+        collection(db, "users", uid, "enrollments"),
+        orderBy("lastAccessedAt", "desc")
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          setEnrollments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+          setLoading(false);
+        },
+        () => {
+          // permission-denied / missing collection — degrade quietly
+          setEnrollments([]);
+          setLoading(false);
+        }
+      );
+      return unsub;
+    } catch {
+      setEnrollments([]);
+      setLoading(false);
+    }
+  }, [uid]);
+
+  return { enrollments, loading };
+}
+
+function useNotifications(uid) {
+  const [notifications, setNotifications] = useState([]);
+
+  useEffect(() => {
+    if (!uid || !db) {
+      setNotifications([]);
+      return;
+    }
+    try {
+      const q = query(
+        collection(db, "users", uid, "notifications"),
+        orderBy("createdAt", "desc")
+      );
+      const unsub = onSnapshot(
+        q,
+        (snap) => {
+          setNotifications(
+            snap.docs.map((d) => {
+              const data = d.data();
+              return {
+                id: d.id,
+                title: data.title,
+                body: data.body,
+                read: !!data.read,
+                link: data.link || null,
+                createdAt: data.createdAt?.toDate ? data.createdAt.toDate() : null,
+              };
+            })
+          );
+        },
+        () => setNotifications([])
+      );
+      return unsub;
+    } catch {
+      setNotifications([]);
+    }
+  }, [uid]);
+
+  const markRead = useCallback(
+    async (id) => {
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+      if (!uid || !db) return;
+      try {
+        await updateDoc(doc(db, "users", uid, "notifications", id), { read: true });
+      } catch {
+        /* best-effort; UI already reflects the read state */
+      }
+    },
+    [uid]
+  );
+
+  const markAllRead = useCallback(async () => {
+    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    if (!uid || !db) return;
+    await Promise.allSettled(
+      notifications
+        .filter((n) => !n.read)
+        .map((n) => updateDoc(doc(db, "users", uid, "notifications", n.id), { read: true }))
+    );
+  }, [uid, notifications]);
+
+  return { notifications, markRead, markAllRead };
+}
+
+/** Soft ambient glow behind the sidebar content. */
 function SidebarGlow() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
@@ -88,19 +235,13 @@ function SidebarGlow() {
   );
 }
 
-/** Renders the user's profile photo when available, falling back to
- *  an initials circle. `loading` shows a pulse skeleton instead. */
+/** Renders the user's profile photo when available, falling back to initials. */
 function Avatar({ user, size = 32, className = "" }) {
   const [imgFailed, setImgFailed] = useState(false);
   const dimension = { height: size, width: size };
 
   if (user === undefined) {
-    return (
-      <span
-        className={`shrink-0 animate-pulse rounded-full bg-white/15 ${className}`}
-        style={dimension}
-      />
-    );
+    return <span className={`shrink-0 animate-pulse rounded-full bg-white/15 ${className}`} style={dimension} />;
   }
 
   if (user?.photoURL && !imgFailed) {
@@ -126,32 +267,52 @@ function Avatar({ user, size = 32, className = "" }) {
   );
 }
 
-/** Resolve a page title from the current path, falling back gracefully
- *  for nested/dynamic routes (e.g. /dashboard/my-courses/:id). */
+/** Small circular progress ring — used for the sidebar's overall-completion badge. */
+function ProgressRing({ pct = 0, size = 44, stroke = 4 }) {
+  const radius = (size - stroke) / 2;
+  const circumference = 2 * Math.PI * radius;
+  const offset = circumference * (1 - Math.min(Math.max(pct, 0), 100) / 100);
+
+  return (
+    <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} className="shrink-0 -rotate-90">
+      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.12)" strokeWidth={stroke} />
+      <motion.circle
+        cx={size / 2}
+        cy={size / 2}
+        r={radius}
+        fill="none"
+        stroke={AMBER}
+        strokeWidth={stroke}
+        strokeLinecap="round"
+        strokeDasharray={circumference}
+        initial={{ strokeDashoffset: circumference }}
+        animate={{ strokeDashoffset: offset }}
+        transition={{ duration: 0.8, ease: EASE }}
+      />
+    </svg>
+  );
+}
+
+/** Resolve a page title from the current path, falling back gracefully. */
 function titleForPath(pathname) {
   const exact = NAV_ITEMS.find((item) => item.to === pathname);
   if (exact) return exact.label;
-  const nested = NAV_ITEMS.find(
-    (item) => item.to !== "/dashboard" && pathname.startsWith(item.to + "/")
-  );
+  const nested = NAV_ITEMS.find((item) => item.to !== "/dashboard" && pathname.startsWith(item.to + "/"));
   return nested ? nested.label : "Dashboard";
 }
 
 /* ------------------------------------------------------------------
-   Sidebar — shared by desktop rail and mobile drawer. `collapsed`
-   only applies on desktop; the mobile drawer always renders labels.
+   Sidebar — shared by desktop rail and mobile drawer.
 ------------------------------------------------------------------- */
-function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef }) {
+function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef, overallPct, streakDays }) {
   const location = useLocation();
 
   return (
     <div className="relative z-10 flex h-full flex-col px-3 py-5 text-white">
-      {/* brand */}
       <div className={`mb-8 flex items-center gap-2.5 px-2 ${collapsed ? "justify-center" : ""}`}>
         <img src={CA2Logo} alt="Creative Adhyayan" className="h-13 w-13 shrink-0 rounded-lg object-contain" />
       </div>
 
-      {/* nav */}
       <nav className="flex flex-1 flex-col gap-1" aria-label="Student dashboard">
         {NAV_ITEMS.map(({ label, to, icon: Icon, end }, idx) => {
           const isActive = end
@@ -188,8 +349,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
               )}
 
               <Icon
-                className={`relative z-10 h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 ${collapsed ? "mx-auto" : ""
-                  }`}
+                className={`relative z-10 h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:scale-110 ${collapsed ? "mx-auto" : ""}`}
                 strokeWidth={isActive ? 2.25 : 1.85}
               />
 
@@ -208,7 +368,6 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
                 )}
               </AnimatePresence>
 
-              {/* collapsed tooltip */}
               {collapsed && (
                 <span
                   className="pointer-events-none absolute left-full top-1/2 z-20 ml-3 -translate-y-1/2 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold text-[#1B0E3D] opacity-0 shadow-lg shadow-black/20 transition-opacity duration-150 group-hover:opacity-100"
@@ -222,13 +381,30 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
         })}
       </nav>
 
-      {/* user card / logout */}
-      <div className="mt-4 border-t border-white/10 pt-4">
+      {/* momentum card: overall completion ring + streak */}
+      <div className={`mb-1 mt-2 rounded-2xl bg-white/[0.06] p-3 ${collapsed ? "px-2" : ""}`}>
+        <div className={`flex items-center gap-3 ${collapsed ? "flex-col" : ""}`}>
+          <div className="relative flex h-11 w-11 shrink-0 items-center justify-center">
+            <ProgressRing pct={overallPct} />
+            <span className="absolute text-[10px] font-bold text-white">{Math.round(overallPct)}%</span>
+          </div>
+          {!collapsed && (
+            <div className="min-w-0">
+              <p className="text-xs font-semibold text-white">Overall progress</p>
+              <p className="flex items-center gap-1 text-[11px] text-white/50">
+                <Flame className="h-3 w-3" style={{ color: AMBER }} />
+                {streakDays > 0 ? `${streakDays}-day streak` : "Start a streak today"}
+              </p>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="border-t border-white/10 pt-3">
         <button
           type="button"
           onClick={onLogout}
-          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-colors duration-200 hover:bg-white/[0.06] hover:text-white ${collapsed ? "justify-center" : ""
-            }`}
+          className={`group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-white/60 transition-colors duration-200 hover:bg-white/[0.06] hover:text-white ${collapsed ? "justify-center" : ""}`}
           title={collapsed ? "Log out" : undefined}
         >
           <LogOut className="h-[18px] w-[18px] shrink-0 transition-transform duration-200 group-hover:-translate-x-0.5" strokeWidth={1.85} />
@@ -246,9 +422,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef })
                 </>
               ) : (
                 <>
-                  <p className="truncate text-xs font-semibold text-white">
-                    {user?.displayName || "Student"}
-                  </p>
+                  <p className="truncate text-xs font-semibold text-white">{user?.displayName || "Student"}</p>
                   <p className="truncate text-[11px] text-white/45">{user?.email || ""}</p>
                 </>
               )}
@@ -267,12 +441,10 @@ export default function StudentLayout() {
   });
   const [mobileOpen, setMobileOpen] = useState(false);
   const [accountOpen, setAccountOpen] = useState(false);
-  // undefined = auth state unknown (still resolving), null = signed out
-  const [user, setUser] = useState(undefined);
+  const [user, setUser] = useState(undefined); // undefined = resolving, null = signed out
   const [searchValue, setSearchValue] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [activeResultIndex, setActiveResultIndex] = useState(-1);
-  const [notifications, setNotifications] = useState([]);
   const [notifOpen, setNotifOpen] = useState(false);
   const [logoutError, setLogoutError] = useState(null);
 
@@ -287,49 +459,48 @@ export default function StudentLayout() {
 
   useEffect(() => onAuthStateChanged(auth, setUser), []);
 
-  // persist collapse preference
+  const { enrollments } = useEnrollments(user?.uid);
+  const { notifications, markRead, markAllRead } = useNotifications(user?.uid);
+
+  const overallPct = useMemo(() => {
+    if (!enrollments.length) return 0;
+    const sum = enrollments.reduce((acc, e) => acc + (e.progressPct ?? 0), 0);
+    return sum / enrollments.length;
+  }, [enrollments]);
+
+  // "continue learning" = most recently touched course that isn't finished
+  const continueCourse = useMemo(
+    () => enrollments.find((e) => (e.progressPct ?? 0) < 100) || null,
+    [enrollments]
+  );
+
+  const streakDays = user?.streakDays ?? (continueCourse ? 1 : 0);
+
   useEffect(() => {
     window.localStorage.setItem(COLLAPSE_KEY, collapsed ? "1" : "0");
   }, [collapsed]);
 
-  // close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [location.pathname]);
 
-  // lock body scroll + manage focus while the mobile drawer is open
   useEffect(() => {
     document.body.style.overflow = mobileOpen ? "hidden" : "";
     if (mobileOpen) {
-      // move focus into the drawer for keyboard/screen-reader users.
-      // preventScroll: true — without it, focusing an element the browser
-      // considers "off-screen" (e.g. behind the topbar) silently scrolls
-      // the whole page to reveal it, which on a page with any horizontal
-      // overflow can shove the viewport sideways.
-      const id = requestAnimationFrame(() =>
-        drawerFirstLinkRef.current?.focus({ preventScroll: true })
-      );
+      const id = requestAnimationFrame(() => drawerFirstLinkRef.current?.focus({ preventScroll: true }));
       return () => cancelAnimationFrame(id);
     }
-    // return focus to the trigger when the drawer closes — same reasoning
     mobileMenuBtnRef.current?.focus({ preventScroll: true });
     return () => {
       document.body.style.overflow = "";
     };
   }, [mobileOpen]);
 
-  // close account/search/notifications on outside click or Escape; ⌘K / Ctrl+K focuses search
   useEffect(() => {
     function handleClick(e) {
-      if (accountRef.current && !accountRef.current.contains(e.target)) {
-        setAccountOpen(false);
-      }
-      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) {
-        setSearchOpen(false);
-      }
-      if (notifRef.current && !notifRef.current.contains(e.target)) {
-        setNotifOpen(false);
-      }
+      if (accountRef.current && !accountRef.current.contains(e.target)) setAccountOpen(false);
+      if (searchWrapRef.current && !searchWrapRef.current.contains(e.target)) setSearchOpen(false);
+      if (notifRef.current && !notifRef.current.contains(e.target)) setNotifOpen(false);
     }
     function handleKey(e) {
       if (e.key === "Escape") {
@@ -352,7 +523,6 @@ export default function StudentLayout() {
     };
   }, []);
 
-  // auto-dismiss the logout error toast
   useEffect(() => {
     if (!logoutError) return;
     const t = setTimeout(() => setLogoutError(null), 5000);
@@ -364,22 +534,32 @@ export default function StudentLayout() {
     try {
       await signOut(auth);
       navigate("/login");
-    } catch (err) {
+    } catch {
       setLogoutError("Couldn't log you out — check your connection and try again.");
     }
   }, [navigate]);
 
-  const closeMobileNav = useCallback(() => {
-    setMobileOpen(false);
-  }, []);
+  const closeMobileNav = useCallback(() => setMobileOpen(false), []);
+  const toggleCollapsed = useCallback(() => setCollapsed((c) => !c), []);
 
-  // quick-nav search over the dashboard sections. Swap SEARCH_INDEX below
-  // for real course/lesson data once it's available (same {label, to, icon} shape).
+  // command palette index: nav routes + quick actions + live course titles
+  const searchIndex = useMemo(() => {
+    const navEntries = NAV_ITEMS.map((item) => ({ ...item, group: "Go to" }));
+    const courseEntries = enrollments.map((e) => ({
+      label: e.courseTitle || "Untitled course",
+      to: e.courseId ? `/dashboard/my-courses/${e.courseId}` : "/dashboard/my-courses",
+      icon: PlayCircle,
+      group: "Courses",
+    }));
+    const actions = buildQuickActions({ onLogout: handleLogout, onToggleCollapse: toggleCollapsed, collapsed });
+    return [...navEntries, ...courseEntries, ...actions];
+  }, [enrollments, handleLogout, toggleCollapsed, collapsed]);
+
   const searchResults = useMemo(() => {
-    const query = searchValue.trim().toLowerCase();
-    if (!query) return NAV_ITEMS;
-    return NAV_ITEMS.filter((item) => item.label.toLowerCase().includes(query));
-  }, [searchValue]);
+    const q = searchValue.trim().toLowerCase();
+    if (!q) return searchIndex;
+    return searchIndex.filter((item) => item.label.toLowerCase().includes(q));
+  }, [searchIndex, searchValue]);
 
   useEffect(() => {
     setActiveResultIndex(searchResults.length ? 0 : -1);
@@ -388,7 +568,8 @@ export default function StudentLayout() {
   const selectSearchResult = useCallback(
     (item) => {
       if (!item) return;
-      navigate(item.to);
+      if (item.action) item.action();
+      else if (item.to) navigate(item.to);
       setSearchValue("");
       setSearchOpen(false);
       searchRef.current?.blur();
@@ -416,23 +597,23 @@ export default function StudentLayout() {
     [searchResults, activeResultIndex, selectSearchResult]
   );
 
-  const unreadCount = useMemo(
-    () => notifications.filter((n) => !n.read).length,
-    [notifications]
-  );
+  const unreadCount = useMemo(() => notifications.filter((n) => !n.read).length, [notifications]);
 
-  const markAllNotificationsRead = useCallback(() => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-  }, []);
+  const handleNotificationClick = useCallback(
+    (n) => {
+      if (!n.read) markRead(n.id);
+      if (n.link) navigate(n.link);
+      setNotifOpen(false);
+    },
+    [markRead, navigate]
+  );
 
   const pageTitle = useMemo(() => titleForPath(location.pathname), [location.pathname]);
   const firstName = (user?.displayName || "there").split(" ")[0];
   const greeting = greetingForHour(new Date().getHours());
-  const isOverview = location.pathname === "/dashboard";
 
   return (
     <div className="flex min-h-screen overflow-x-hidden" style={{ background: CANVAS }}>
-      {/* logout error toast */}
       <AnimatePresence>
         {logoutError && (
           <motion.div
@@ -474,17 +655,13 @@ export default function StudentLayout() {
             user={user}
             onLogout={handleLogout}
             onNavigate={() => { }}
+            overallPct={overallPct}
+            streakDays={streakDays}
           />
         </div>
       </motion.aside>
 
       {/* ================= MOBILE DRAWER ================= */}
-      {/* Scrim — always mounted; visibility is driven directly by mobileOpen via
-    opacity + pointer-events, not by framer-motion's exit lifecycle. This
-    guarantees the close is synchronous with React state even if an exit
-    animation would otherwise fail to resolve (stale AnimatePresence
-    context from a duplicate framer-motion install, interrupted transitions
-    from rapid toggling, etc). */}
       <div
         onClick={() => setMobileOpen(false)}
         aria-hidden="true"
@@ -493,11 +670,6 @@ export default function StudentLayout() {
         style={{ transitionTimingFunction: "cubic-bezier(0.16, 1, 0.3, 1)" }}
       />
 
-      {/* Drawer — always mounted, transform toggled via class instead of x/exit.
-    `inert` when closed removes its interior nav links/buttons from the tab
-    order and from find-in-page, since they're still in the DOM (just
-    translated off-screen) and would otherwise be reachable by keyboard
-    even while hidden — the old mount/unmount version got this for free. */}
       <aside
         role="dialog"
         aria-modal={mobileOpen}
@@ -524,12 +696,14 @@ export default function StudentLayout() {
             onLogout={handleLogout}
             onNavigate={closeMobileNav}
             firstLinkRef={drawerFirstLinkRef}
+            overallPct={overallPct}
+            streakDays={streakDays}
           />
         </div>
       </aside>
+
       {/* ================= MAIN COLUMN ================= */}
       <div className="flex min-h-screen min-w-0 flex-1 flex-col overflow-x-hidden">
-        {/* topbar */}
         <header
           className="sticky top-0 z-30 flex items-center gap-3 border-b px-4 py-3.5 shadow-sm shadow-violet-900/[0.03] backdrop-blur-md sm:px-6"
           style={{ background: "rgba(236,238,243,0.85)", borderColor: BORDER }}
@@ -547,7 +721,7 @@ export default function StudentLayout() {
 
           <button
             type="button"
-            onClick={() => setCollapsed((c) => !c)}
+            onClick={toggleCollapsed}
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
             aria-pressed={collapsed}
             className="hidden h-9 w-9 shrink-0 items-center justify-center rounded-full text-[#1B0E3D] shadow-sm transition-all duration-200 hover:scale-105 hover:bg-violet-50 active:scale-95 lg:flex"
@@ -560,30 +734,49 @@ export default function StudentLayout() {
           </button>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[11px] font-semibold uppercase tracking-wider text-[#8A82A6]">
-              {isOverview ? "Overview" : "Student Dashboard"}
-            </p>
             <AnimatePresence mode="wait">
-              <motion.h1
+              <motion.p
                 key={location.pathname}
                 initial={{ opacity: 0, y: -4 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: 4 }}
                 transition={{ duration: 0.18, ease: EASE }}
-                className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl"
+                className="truncate text-[11px] font-semibold uppercase tracking-wider text-[#8A82A6]"
               >
-                {isOverview ? (
-                  <>
-                    {greeting}, <span style={{ color: ACCENT }}>{firstName}</span>
-                  </>
-                ) : (
-                  pageTitle
-                )}
-              </motion.h1>
+                {pageTitle}
+              </motion.p>
             </AnimatePresence>
+            <h1 className="truncate text-lg font-bold text-[#1B0E3D] sm:text-xl">
+              {greeting}, <span style={{ color: ACCENT }}>{firstName}</span>
+            </h1>
           </div>
 
-          {/* search — desktop only */}
+          {/* continue-learning strip — desktop/tablet only, hidden if nothing in progress */}
+          {continueCourse && (
+            <button
+              type="button"
+              onClick={() =>
+                navigate(continueCourse.courseId ? `/dashboard/my-courses/${continueCourse.courseId}` : "/dashboard/my-courses")
+              }
+              className="group hidden max-w-[220px] shrink-0 items-center gap-2.5 rounded-full py-1.5 pl-1.5 pr-3.5 text-left shadow-sm transition-all duration-200 hover:shadow-md md:flex"
+              style={{ background: LIGHT }}
+            >
+              <span
+                className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-white transition-transform duration-200 group-hover:scale-105"
+                style={{ background: `linear-gradient(135deg, ${ACCENT}, #8B5CF6)` }}
+              >
+                <PlayCircle className="h-3.5 w-3.5" />
+              </span>
+              <span className="min-w-0">
+                <span className="block text-[10px] font-semibold uppercase tracking-wide text-[#A79BC4]">Continue</span>
+                <span className="block truncate text-xs font-semibold text-[#1B0E3D]">
+                  {continueCourse.courseTitle || "Your course"}
+                </span>
+              </span>
+            </button>
+          )}
+
+          {/* search — desktop only, now a real command palette */}
           <div ref={searchWrapRef} className="relative hidden w-64 shrink-0 md:block">
             <label className="relative flex items-center">
               <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#A79BC4]" />
@@ -601,8 +794,8 @@ export default function StudentLayout() {
                 }}
                 onFocus={() => setSearchOpen(true)}
                 onKeyDown={handleSearchKeyDown}
-                placeholder="Search courses, lessons…"
-                aria-label="Search courses and lessons"
+                placeholder="Search courses, actions…"
+                aria-label="Search courses and actions"
                 className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] shadow-sm outline-none ring-1 ring-transparent transition-all duration-200 placeholder:text-[#A79BC4] focus:shadow-md focus:shadow-violet-200/40 focus:ring-2"
                 style={{ "--tw-ring-color": ACCENT }}
               />
@@ -635,27 +828,36 @@ export default function StudentLayout() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
                   transition={SPRING}
-                  className="absolute right-0 top-full z-20 mt-2 w-full origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                  className="absolute right-0 top-full z-20 mt-2 max-h-80 w-full overflow-y-auto origin-top-right rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
                 >
                   {searchResults.length === 0 ? (
-                    <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">
-                      No matches for “{searchValue}”
-                    </li>
+                    <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">No matches for “{searchValue}”</li>
                   ) : (
-                    searchResults.map((item, idx) => (
-                      <li key={item.to} role="option" aria-selected={idx === activeResultIndex}>
-                        <button
-                          type="button"
-                          onMouseEnter={() => setActiveResultIndex(idx)}
-                          onClick={() => selectSearchResult(item)}
-                          className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${idx === activeResultIndex
-                            ? "bg-violet-50 text-[#1B0E3D]"
-                            : "text-[#4A3D66] hover:bg-violet-50"
-                            }`}
-                        >
-                          <item.icon className="h-4 w-4 shrink-0 text-[#8A82A6]" />
-                          {item.label}
-                        </button>
+                    Object.entries(
+                      searchResults.reduce((acc, item, idx) => {
+                        const group = item.group || "Go to";
+                        (acc[group] ||= []).push({ ...item, idx });
+                        return acc;
+                      }, {})
+                    ).map(([group, items]) => (
+                      <li key={group}>
+                        <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-[#A79BC4]">{group}</p>
+                        <ul>
+                          {items.map(({ idx, ...item }) => (
+                            <li key={`${group}-${item.label}`} role="option" aria-selected={idx === activeResultIndex}>
+                              <button
+                                type="button"
+                                onMouseEnter={() => setActiveResultIndex(idx)}
+                                onClick={() => selectSearchResult(item)}
+                                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${idx === activeResultIndex ? "bg-violet-50 text-[#1B0E3D]" : "text-[#4A3D66] hover:bg-violet-50"
+                                  }`}
+                              >
+                                <item.icon className="h-4 w-4 shrink-0 text-[#8A82A6]" />
+                                {item.label}
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
                       </li>
                     ))
                   )}
@@ -664,7 +866,7 @@ export default function StudentLayout() {
             </AnimatePresence>
           </div>
 
-          {/* notifications */}
+          {/* notifications — items are now clickable and mark themselves read */}
           <div ref={notifRef} className="relative shrink-0">
             <button
               type="button"
@@ -707,7 +909,7 @@ export default function StudentLayout() {
                     {unreadCount > 0 && (
                       <button
                         type="button"
-                        onClick={markAllNotificationsRead}
+                        onClick={markAllRead}
                         className="text-xs font-semibold text-[#5227FF] transition-colors hover:text-[#1B0E3D] hover:underline"
                       >
                         Mark all read
@@ -726,13 +928,19 @@ export default function StudentLayout() {
                     <ul className="max-h-72 overflow-y-auto">
                       {notifications.map((n) => (
                         <li key={n.id}>
-                          <div
-                            className={`rounded-xl px-3 py-2.5 text-sm transition-colors ${n.read ? "text-[#8A82A6]" : "bg-violet-50/60 text-[#1B0E3D]"
+                          <button
+                            type="button"
+                            onClick={() => handleNotificationClick(n)}
+                            className={`flex w-full items-start gap-2 rounded-xl px-3 py-2.5 text-left text-sm transition-colors ${n.read ? "text-[#8A82A6] hover:bg-violet-50/50" : "bg-violet-50/60 text-[#1B0E3D] hover:bg-violet-50"
                               }`}
                           >
-                            <p className="font-medium">{n.title}</p>
-                            {n.body && <p className="mt-0.5 text-xs text-[#8A82A6]">{n.body}</p>}
-                          </div>
+                            {!n.read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: AMBER }} />}
+                            <span className={`min-w-0 ${n.read ? "pl-3.5" : ""}`}>
+                              <span className="block font-medium">{n.title}</span>
+                              {n.body && <span className="mt-0.5 block text-xs text-[#8A82A6]">{n.body}</span>}
+                              {n.createdAt && <span className="mt-0.5 block text-[10px] text-[#B7AFD0]">{timeAgo(n.createdAt)}</span>}
+                            </span>
+                          </button>
                         </li>
                       ))}
                     </ul>
@@ -766,13 +974,16 @@ export default function StudentLayout() {
                   animate={{ opacity: 1, y: 0, scale: 1 }}
                   exit={{ opacity: 0, y: -6, scale: 0.98 }}
                   transition={SPRING}
-                  className="absolute right-0 top-full mt-2 w-52 origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
+                  className="absolute right-0 top-full mt-2 w-56 origin-top-right overflow-hidden rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
                 >
                   <div className="px-3 py-2">
-                    <p className="truncate text-sm font-semibold text-[#1B0E3D]">
-                      {user?.displayName || "Student"}
-                    </p>
+                    <p className="truncate text-sm font-semibold text-[#1B0E3D]">{user?.displayName || "Student"}</p>
                     <p className="truncate text-xs text-[#8A82A6]">{user?.email || ""}</p>
+                    <div className="mt-2 flex items-center gap-1.5 rounded-lg bg-violet-50 px-2 py-1.5 text-[11px] font-semibold text-[#5227FF]">
+                      <Sparkles className="h-3 w-3" />
+                      {Math.round(overallPct)}% complete across {enrollments.length || 0} course
+                      {enrollments.length === 1 ? "" : "s"}
+                    </div>
                   </div>
                   <div className="my-1 h-px bg-violet-100" />
                   <NavLink
@@ -799,7 +1010,7 @@ export default function StudentLayout() {
           </div>
         </header>
 
-        {/* routed page content — soft fade/slide on every route change */}
+        {/* routed page content */}
         <main id="main-content" className="min-w-0 flex-1 overflow-x-hidden px-4 py-6 sm:px-6 lg:px-8">
           <AnimatePresence mode="wait">
             <motion.div

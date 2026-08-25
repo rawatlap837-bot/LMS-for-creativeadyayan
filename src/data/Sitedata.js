@@ -28,6 +28,7 @@ export const COURSES_BY_CATEGORY = {
             id: "dm-basic",
             title: "Digital Marketing Basic Programme",
             image: "/images/courses/digital-marketing-basic.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Start your digital journey. Learn the basics of SEO, social media, content, and branding in a fun and practical program designed for beginners.",
@@ -45,6 +46,7 @@ export const COURSES_BY_CATEGORY = {
             id: "dm-advanced",
             title: "Digital Marketing Advanced Programme",
             image: "/images/courses/digital-marketing-advanced.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Go from basic to badass marketer! Learn advanced ads, SEO, email automation, and data-driven strategies to scale brands and get real results.",
@@ -68,6 +70,7 @@ export const COURSES_BY_CATEGORY = {
             id: "cgd",
             title: "(CGD) Certificate in Graphic Design",
             image: "/images/courses/cgd.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Turn ideas into stunning visuals! Learn graphic tools, branding basics, and modern design skills to become a confident designer.",
@@ -85,6 +88,7 @@ export const COURSES_BY_CATEGORY = {
             id: "sdma",
             title: "(SDMA) Specialized Diploma in Multimedia and Animation",
             image: "/images/courses/sdma.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Create the magic you watch on screen! Learn animation, 3D design, motion graphics, VFX, and creative media skills used in movies, gaming, and digital content.",
@@ -103,6 +107,7 @@ export const COURSES_BY_CATEGORY = {
             id: "adma",
             title: "(ADMA) Advance Diploma in Multimedia and Animation",
             image: "/images/courses/adma.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "A complete advanced diploma designed for students aiming for professional careers in animation studios, film production, gaming, VFX houses, and creative media companies.",
@@ -122,6 +127,7 @@ export const COURSES_BY_CATEGORY = {
             id: "mdma",
             title: "(MDMA) Master Diploma in Multimedia and Animation",
             image: "/images/courses/mdma.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Master the world of animation and multimedia with expert-level training in 3D, VFX, CGI, film editing, and high-end digital content creation.",
@@ -145,6 +151,7 @@ export const COURSES_BY_CATEGORY = {
             id: "frontend-dev",
             title: "Front-End Development",
             image: "/images/courses/frontend-development.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "A complete front-end development course covering web fundamentals, interactive UI design, and modern frameworks for industry-ready skills.",
@@ -163,6 +170,7 @@ export const COURSES_BY_CATEGORY = {
             id: "fullstack-dev",
             title: "Full-Stack Development",
             image: "/images/courses/fullstack-development.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Become a job-ready full-stack developer. Learn UI design, server-side coding, databases, APIs, and cloud deployment through real-world projects.",
@@ -187,13 +195,14 @@ export const COURSES_BY_CATEGORY = {
             id: "uiux-diploma",
             title: "Diploma in UI/UX Design",
             image: "/images/courses/uiux-diploma.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Build a career in UI/UX with hands-on training in user research, design thinking, interface creation, prototyping, and portfolio development for real-world projects.",
             features: [
-                "Boosts creative and visual thinking skills",
-                "Enhances problem-solving through user understanding",
-                "Improves attention to detail and quality",
+                "Boosts creative and visual thinking skills.",
+                "Enhances problem-solving through user understanding.",
+                "Improves attention to detail and quality.",
                 "Encourages innovation and new ideas",
                 "Free Internship",
                 "Freelancing Projects",
@@ -210,6 +219,7 @@ export const COURSES_BY_CATEGORY = {
             id: "pdse",
             title: "(PDSE) Professional Diploma in Software Engineering",
             image: "/images/courses/pdse.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Master coding, software development, and real-world engineering skills to build modern applications from scratch.",
@@ -227,6 +237,7 @@ export const COURSES_BY_CATEGORY = {
             id: "adse",
             title: "(ADSE) Advance Diploma in Software Engineering",
             image: "/images/courses/adse.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Level up your software engineering skills with advanced coding, system design, cloud deployment, and scalable application development.",
@@ -246,6 +257,7 @@ export const COURSES_BY_CATEGORY = {
             id: "mdse",
             title: "(MDSE) Master Diploma in Software Engineering",
             image: "/images/courses/mdse.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Master software engineering with advanced programming, system design, cloud technologies, and enterprise-grade application development.",
@@ -269,6 +281,7 @@ export const COURSES_BY_CATEGORY = {
             id: "cifa",
             title: "(CIFA) Certificate in Financial Accounting",
             image: "/images/courses/cifa.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Start your accounting career with hands-on training in bookkeeping, ledger management, and financial statement preparation. Ideal for students, entrepreneurs, and professionals.",
@@ -286,6 +299,7 @@ export const COURSES_BY_CATEGORY = {
             id: "sdea",
             title: "(SDEA) Specialized Diploma in E-Accounting",
             image: "/images/courses/sdea.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Build a career in e-accounting with hands-on training in Tally Prime, GST, automated accounting workflows, and real-world financial management.",
@@ -304,6 +318,7 @@ export const COURSES_BY_CATEGORY = {
             id: "mdea",
             title: "(MDEA) Master Diploma in E-Accounting",
             image: "/images/courses/mdea.jpg",
+            rating: 5,
             tags: ["Beginner friendly", "Flexible Batches", "Hands-On Projects"],
             description:
                 "Lead the future of finance! Learn advanced e-accounting, automation, ERP systems, and real-world financial management skills for high-level careers.",

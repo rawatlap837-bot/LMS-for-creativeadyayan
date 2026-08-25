@@ -2,7 +2,8 @@ import Hero from "../components/Hero";
 import Navbar from "../components/Navbar";
 import Testimonials from "../components/Testimonials";
 import TrustSection from "../components/TrustSection";
-import PopularCategory from "../components/Popularcategory";
+// import PopularCategory from "../components/Popularcategory";
+import ShortCourses from "../components/Shortcoursessection";
 import DashboardSection from "../components/Dashboard";
 import InstructorExcellence from "../components/Instructorexcellence";
 import LiveCourses from "../components/Livecourses";
@@ -15,10 +16,11 @@ export default function Home() {
       <Navbar />
       <Hero />
       <TrustSection />
-      <PopularCategory />
+      {/* <PopularCategory /> */}
+      <LiveCourses /> 
       <DashboardSection />
       <InstructorExcellence />
-      <LiveCourses />
+      <ShortCourses />
       <FAQ />
       <Testimonials />
     </>
