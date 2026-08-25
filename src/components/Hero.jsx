@@ -330,7 +330,7 @@ const RotatingCourseWord = memo(function RotatingCourseWord({ words }) {
   }, [words]);
 
   return (
-    <span className="text-[#FFDE21] text-3xl sm:text-6xl">
+    <span className="text-[#FFDE21] text-4xl sm:text-6xl">
       <SlotText text={words[index]} options={{ direction: "up", stagger: 40 }} />
     </span>
   );
@@ -493,21 +493,25 @@ export default function Hero() {
           >
             <span className="block">Learn. Get Hired. Get Paid.</span>
             <span className="flex flex-col items-center justify-center">
-              <span className="font-pliant mt-2.5 mb-5 inline-flex flex-wrap items-baseline justify-center gap-x-3 text-3xl sm:text-6xl text-[#C4B2FF] leading-none">
+              <span className="font-pliant mt-2.5 mb-5 inline-flex flex-wrap items-baseline justify-center gap-x-3 text-4xl sm:text-6xl text-[#C4B2FF] leading-none">
                 <span>Faster With</span>
                 <RotatingCourseWord words={ROTATING_COURSES} />
               </span>
             </span>
           </motion.h1>
           <StatsStrip />
-          <div className="mt-9 flex flex-wrap items-center justify-center gap-4">
-            <Button href="#programs" text="Explore Courses" />
+          <div className="mt-9 flex w-full max-w-sm flex-nowrap items-center justify-center gap-3 sm:max-w-none sm:w-auto sm:gap-4">
+            <Button
+              href="#programs"
+              text="Explore Courses"
+              className="flex-1 min-w-0 justify-center whitespace-nowrap px-4 py-3 text-sm sm:flex-none sm:px-8 sm:py-4 sm:text-base"
+            />
             <motion.a
               href="#demo"
               whileHover={{ scale: 1.03 }}
               whileTap={{ scale: 0.97 }}
               transition={{ type: "spring", stiffness: 400, damping: 25 }}
-              className="group relative inline-flex items-center gap-2.5 overflow-hidden rounded-xl border border-white/25 bg-white/5 px-8 py-4 text-base font-semibold text-white backdrop-blur-sm transition-colors duration-300 hover:border-white/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4B2FF]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150A30]"
+              className="group relative flex-1 min-w-0 inline-flex items-center justify-center gap-1.5 overflow-hidden whitespace-nowrap rounded-xl border border-white/25 bg-white/5 px-4 py-3 text-sm font-semibold text-white backdrop-blur-sm transition-colors duration-300 hover:border-white/40 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#C4B2FF]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#150A30] sm:flex-none sm:gap-2.5 sm:px-8 sm:py-4 sm:text-base"
             >
               {/* soft sheen sweep on hover */}
               <span
@@ -515,12 +519,12 @@ export default function Hero() {
                 className="pointer-events-none absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent transition-transform duration-700 ease-out group-hover:translate-x-full"
               />
               <PlayCircle
-                size={20}
-                className="relative text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
+                size={18}
+                className="relative shrink-0 text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110 sm:size-5"
               />
               <span className="relative">Watch Demo</span>
             </motion.a>
-          </div>
+          </div>F
 
           <ImageCardFan />
         </div>
