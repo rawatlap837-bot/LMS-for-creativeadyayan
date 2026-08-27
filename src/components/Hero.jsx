@@ -3,7 +3,6 @@ import React, {
   useEffect,
   useRef,
   useMemo,
-  useCallback,
   memo,
   lazy,
   Suspense,
@@ -103,8 +102,50 @@ const FAN_CARD_VARIANTS = {
   }),
 };
 
+// Hoisted so these plain objects aren't re-created on every card render —
+// only two variants exist (featured vs. not), so we pick between them
+// instead of building a fresh object literal per card per render.
+const FAN_HOVER_FEATURED = {
+  y: -3,
+  scale: 1.008,
+  transition: { duration: 0.25, ease: "easeOut" },
+};
+const FAN_HOVER_DEFAULT = {
+  y: -3,
+  scale: 1.005,
+  transition: { duration: 0.25, ease: "easeOut" },
+};
+
 const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
-  const cards = isMobile ? FAN_CARDS_MOBILE : FAN_CARDS;
+  // Recomputed only when `isMobile` actually flips (this component is
+  // memoized on that single prop), so the width/height clamp() strings
+  // and per-card style objects aren't rebuilt on unrelated parent renders.
+  const cards = useMemo(() => {
+    const source = isMobile ? FAN_CARDS_MOBILE : FAN_CARDS;
+    return source.map((c, i) => ({
+      ...c,
+      style: {
+        zIndex: c.z,
+        marginLeft: i === 0 ? 0 : "clamp(-60px, -6vw, -26px)",
+        width: isMobile
+          ? c.featured
+            ? "clamp(150px, 34vw, 220px)"
+            : "clamp(110px, 26vw, 170px)"
+          : c.featured
+            ? "clamp(118px, 25vw, 320px)"
+            : "clamp(88px, 18vw, 245px)",
+        height: isMobile
+          ? c.featured
+            ? "clamp(230px, 52vw, 330px)"
+            : "clamp(170px, 40vw, 250px)"
+          : c.featured
+            ? "clamp(178px, 36vw, 445px)"
+            : "clamp(132px, 27vw, 345px)",
+        background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
+      },
+      hover: c.featured ? FAN_HOVER_FEATURED : FAN_HOVER_DEFAULT,
+    }));
+  }, [isMobile]);
 
   return (
     <motion.div
@@ -112,42 +153,21 @@ const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
       whileInView="visible"
       viewport={{ once: true, amount: 0.4 }}
       variants={FAN_CONTAINER_VARIANTS}
-      className="relative mt-10 flex w-full items-end justify-center sm:mt-5"
+      className={`relative mt-5 flex w-full items-end justify-center sm:mt-5 ${isMobile ? "translate-y-6" : ""
+        }`}
     >
-      {cards.map((c, i) => (
+      {cards.map((c) => (
         <motion.div
           key={c.id}
           custom={c}
           variants={FAN_CARD_VARIANTS}
-          whileHover={{
-            y: -3,
-            scale: c.featured ? 1.008 : 1.005,
-            transition: { duration: 0.25, ease: "easeOut" },
-          }}
-          style={{
-            zIndex: c.z,
-            marginLeft: i === 0 ? 0 : "clamp(-60px, -6vw, -26px)",
-            width: isMobile
-              ? c.featured
-                ? "clamp(150px, 34vw, 220px)"
-                : "clamp(110px, 26vw, 170px)"
-              : c.featured
-                ? "clamp(118px, 25vw, 320px)"
-                : "clamp(88px, 18vw, 245px)",
-            height: isMobile
-              ? c.featured
-                ? "clamp(230px, 52vw, 330px)"
-                : "clamp(170px, 40vw, 250px)"
-              : c.featured
-                ? "clamp(178px, 36vw, 445px)"
-                : "clamp(132px, 27vw, 345px)",
-            background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
-          }}
+          whileHover={c.hover}
+          style={c.style}
           className="relative flex-none origin-bottom overflow-hidden rounded-[16px] border border-white/15 shadow-[0_24px_52px_-13px_rgba(10,4,26,0.7)] sm:rounded-[28px]"
         >
           {/*
             Placeholder tile — replace this whole block with:
-            <img src={c.src} alt="" className="h-full w-full object-cover" draggable={false} />
+            <img src={c.src} alt="" loading="lazy" decoding="async" className="h-full w-full object-cover" draggable={false} />
           */}
           <div className="flex h-full w-full items-center justify-center">
             <span className="text-[10px] uppercase tracking-wide text-white/50 sm:text-sm">
@@ -159,6 +179,7 @@ const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
     </motion.div>
   );
 });
+
 // Hoisted outside the component so these plain objects aren't
 // re-created (and don't trigger new prop identities) on every render.
 const STATS_CONTAINER_VARIANTS = {
@@ -177,9 +198,10 @@ const SCRIM_DESKTOP =
   "linear-gradient(180deg, rgba(10,4,26,0.45) 0%, rgba(10,4,26,0.05) 35%, rgba(10,4,26,0.55) 100%)";
 
 /**
- * Responsive breakpoint hook — debounced so a window drag doesn't fire a
- * state update (and a full re-render) on every single resize tick, and
- * seeded with matchMedia so there's no layout flash on mount.
+ * Responsive breakpoint hook. Uses matchMedia's native `change` event
+ * rather than a `resize` listener, so it's already event-driven (fires
+ * only when the query's truth value actually flips) instead of firing
+ * on every pixel of a window drag — no manual debounce needed.
  */
 function useIsMobile(breakpoint = 768) {
   const query = `(max-width: ${breakpoint - 1}px)`;
@@ -394,25 +416,29 @@ const StatsStrip = memo(function StatsStrip() {
       whileInView="visible"
       viewport={{ once: true, amount: 0.3 }}
       variants={STATS_CONTAINER_VARIANTS}
-      className="mt-3 grid grid-cols-3 gap-3 sm:gap-6"
+      className="mt-3 grid grid-cols-3 gap-1.5 sm:gap-6"
     >
       {STATS.map(({ icon: Icon, value, decimals, suffix, label }) => (
         <motion.div
           key={label}
           variants={STATS_ITEM_VARIANTS}
-          className="group flex flex-col items-center gap-0.5 rounded-2xl border border-white/10 bg-white/5 px-5 py-2 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:px-8"
+          className="group flex flex-col items-center gap-0.5 rounded-xl border border-white/10 bg-white/5 px-2 py-1.5 backdrop-blur-sm transition duration-300 hover:border-white/20 hover:bg-white/[0.07] sm:rounded-2xl sm:px-8 sm:py-2"
         >
+          {/*
+            One icon element sized via CSS breakpoints instead of two
+            SVGs toggled with sm:hidden / hidden sm:block — halves the
+            icon DOM/paint cost per stat card.
+          */}
           <Icon
-            size={16}
-            className="text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110"
+            className="h-[13px] w-[13px] text-[#C4B2FF] transition-transform duration-300 group-hover:scale-110 sm:h-4 sm:w-4"
           />
           <AnimatedStatValue
             value={value}
             decimals={decimals}
             suffix={suffix}
-            className="font-display text-lg font-semibold tabular-nums text-white sm:text-xl"
+            className="font-display text-sm font-semibold tabular-nums text-white sm:text-xl"
           />
-          <span className="text-[10px] uppercase tracking-wide text-white/60 sm:text-xs">
+          <span className="text-center text-[8px] leading-tight uppercase tracking-wide text-white/60 sm:text-xs">
             {label}
           </span>
         </motion.div>
@@ -456,7 +482,6 @@ const HeroBackground = memo(function HeroBackground({ isMobile }) {
           />
         </Suspense>
       </motion.div>
-
 
       <div
         className="pointer-events-none absolute -top-40 -left-40 z-[1] h-[520px] w-[520px] rounded-full blur-3xl"
@@ -566,4 +591,4 @@ export default function Hero() {
       </section>
     </>
   );
-} 
+}

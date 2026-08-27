@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, forwardRef } from "react";
 import { Link } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -264,9 +264,20 @@ function DotGrid({ className = "", dot = "fill-[#2E1A55]/10" }) {
     );
 }
 
-function CourseCard({ title, duration, color, image, popular, description }) {
+/**
+ * Wrapped in forwardRef: AnimatePresence needs to attach a ref to this
+ * component's root DOM node to track it for exit animations. Plain
+ * function components can't receive refs, which was previously causing
+ * a "Function components cannot be given refs" warning and silently
+ * breaking exit-animation tracking for cards leaving the grid.
+ */
+const CourseCard = forwardRef(function CourseCard(
+    { title, duration, color, image, popular, description },
+    ref
+) {
     return (
         <motion.div
+            ref={ref}
             layout
             variants={cardVariants}
             initial="hidden"
@@ -332,7 +343,7 @@ function CourseCard({ title, duration, color, image, popular, description }) {
             </div>
         </motion.div>
     );
-}
+});
 
 /**
  * @param {string} [eyebrow]

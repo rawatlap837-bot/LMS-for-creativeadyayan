@@ -336,7 +336,7 @@ const SectionInner = memo(function SectionInner() {
   };
 
   return (
-    <div className="relative w-full px-4 pt-20 pb-20 sm:px-8 sm:pt-0 sm:pb-0" style={sectionBgStyle}>
+    <div className="relative w-full px-4 pt-10 pb-20 sm:px-8 sm:pt-0 sm:pb-0" style={sectionBgStyle}>
       <style>{KEYFRAMES}</style>
 
       <div className="pointer-events-none absolute inset-0 opacity-50" style={gridTextureStyle} aria-hidden="true" />
@@ -374,11 +374,22 @@ const SectionInner = memo(function SectionInner() {
         </div>
 
         {/* mobile / tablet stacked layout — no connector lines here since
-            there's no shared hub geometry to connect to at this width */}
-        <div className="flex flex-col items-center gap-10 lg:hidden">
-          <LearningCore coreRef={mobileCoreRef} onLogoLoad={undefined} />
+            there's no shared hub geometry to connect to at this width.
+            The core now sits between two rows of cards (2 above, 2
+            below) instead of floating above the whole stack, so it
+            visually anchors the middle rather than sitting apart from
+            everything else. */}
+        <div className="flex flex-col items-center gap-8 lg:hidden">
           <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-            {CARDS.map((c) => (
+            {CARDS.slice(0, 2).map((c) => (
+              <SpokeCard key={c.id} card={c} />
+            ))}
+          </div>
+
+          <LearningCore coreRef={mobileCoreRef} onLogoLoad={undefined} />
+
+          <div className="grid w-full grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
+            {CARDS.slice(2).map((c) => (
               <SpokeCard key={c.id} card={c} />
             ))}
           </div>
