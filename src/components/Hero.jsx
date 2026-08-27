@@ -76,11 +76,11 @@ const STATS = [
  * cramped/tall on narrow screens. Desktop still shows all 5.
  */
 const FAN_CARDS = [
-  { id: "c1", from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 65, z: 10 },
+  { id: "c1", from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 75, z: 10 },
   { id: "c2", from: "#A78BFA", to: "#5B21B6", rotate: -8, offsetY: 10, z: 20 },
   { id: "c3", from: "#C4B2FF", to: "#6C5DD3", rotate: 0, offsetY: "10%", z: 40, featured: true },
   { id: "c4", from: "#8B5CF6", to: "#4338CA", rotate: 8, offsetY: 10, z: 20 },
-  { id: "c5", from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 65, z: 10 },
+  { id: "c5", from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 75, z: 10 },
 ];
 
 // The 3 center cards shown on mobile.

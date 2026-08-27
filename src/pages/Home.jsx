@@ -5,7 +5,7 @@ import TrustSection from "../components/TrustSection";
 // import PopularCategory from "../components/Popularcategory";
 import ShortCourses from "../components/Shortcoursessection";
 import DashboardSection from "../components/Dashboard";
-import InstructorExcellence from "../components/Instructorexcellence";
+// import InstructorExcellence from "../components/Instructorexcellence";
 import LiveCourses from "../components/Livecourses";
 import FAQ from "../components/FAQ";
 
@@ -19,7 +19,7 @@ export default function Home() {
       {/* <PopularCategory /> */}
       <LiveCourses /> 
       <DashboardSection />
-      <InstructorExcellence />
+      {/* <InstructorExcellence /> */}
       <ShortCourses />
       <FAQ />
       <Testimonials />

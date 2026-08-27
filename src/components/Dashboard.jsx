@@ -33,16 +33,16 @@ export default function WhyChooseUs() {
   return (
     <section className="bg-white py-12 md:py-20 px-4 sm:px-6 md:px-10">
       <div className="max-w-6xl mx-auto">
-        <span className="inline-flex items-center bg-violet-100 text-violet-700 font-semibold text-xs uppercase tracking-wide px-4 py-2 rounded-full">
+        {/* <span className="inline-flex items-center bg-violet-100 text-violet-700 font-semibold text-xs uppercase tracking-wide px-4 py-2 rounded-full">
           Why Choose Us
         </span>
         <h2 className="mt-4 md:mt-5 font-extrabold text-2xl sm:text-3xl md:text-4xl leading-tight text-violet-900 tracking-tight max-w-2xl">
           Because Digital Marketing Is Not Theory — It&rsquo;s A Performance
-          Skill.
-        </h2>
+          Skill.  
+        </h2> */}
 
         {/* outer frame */}
-        <div className="mt-8 md:mt-12 bg-white rounded-[24px] md:rounded-[40px] shadow-xl shadow-violet-900/5 border border-slate-100 p-2 sm:p-3 md:p-4">
+        <div className="mt-8 md:mt-12 bg-white rounded-[24px] md:rounded-[40px] shadow-xl shadow-violet-900/5 border border-slate-400 p-2 sm:p-3 md:p-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-2 sm:gap-3 md:gap-4 items-stretch">
             {/* Left: headline + photo — stacks on mobile, sits side by side from md up */}
             <div className="group relative rounded-[20px] md:rounded-[32px] overflow-hidden flex flex-col md:flex-row min-h-0 lg:min-h-[520px] bg-violet-700">
