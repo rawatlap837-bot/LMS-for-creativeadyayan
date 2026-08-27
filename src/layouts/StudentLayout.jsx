@@ -313,7 +313,7 @@ function SidebarContent({ collapsed, onNavigate, user, onLogout, firstLinkRef, o
         <img src={CA2Logo} alt="Creative Adhyayan" className="h-13 w-13 shrink-0 rounded-lg object-contain" />
       </div>
 
-      <nav className="flex flex-1 flex-col gap-1" aria-label="Student dashboard">
+      <nav className="flex flex-1 min-h-0 flex-col gap-1 overflow-y-auto overflow-x-hidden" aria-label="Student dashboard">
         {NAV_ITEMS.map(({ label, to, icon: Icon, end }, idx) => {
           const isActive = end
             ? location.pathname === to
@@ -645,7 +645,7 @@ export default function StudentLayout() {
       <motion.aside
         animate={{ width: collapsed ? 84 : 260 }}
         transition={SPRING}
-        className="sticky top-0 hidden h-screen shrink-0 lg:block"
+        className="sticky top-0 hidden min-h-screen shrink-0 lg:block"
         style={{ background: SIDEBAR_BG }}
       >
         <div className="relative h-full overflow-hidden">
@@ -775,96 +775,6 @@ export default function StudentLayout() {
               </span>
             </button>
           )}
-
-          {/* search — desktop only, now a real command palette */}
-          <div ref={searchWrapRef} className="relative hidden w-64 shrink-0 md:block">
-            <label className="relative flex items-center">
-              <Search className="pointer-events-none absolute left-3.5 h-4 w-4 text-[#A79BC4]" />
-              <input
-                ref={searchRef}
-                type="search"
-                role="combobox"
-                aria-expanded={searchOpen}
-                aria-controls="student-search-listbox"
-                aria-autocomplete="list"
-                value={searchValue}
-                onChange={(e) => {
-                  setSearchValue(e.target.value);
-                  setSearchOpen(true);
-                }}
-                onFocus={() => setSearchOpen(true)}
-                onKeyDown={handleSearchKeyDown}
-                placeholder="Search courses, actions…"
-                aria-label="Search courses and actions"
-                className="w-full rounded-full border-0 bg-white py-2.5 pl-10 pr-12 text-sm text-[#1F1533] shadow-sm outline-none ring-1 ring-transparent transition-all duration-200 placeholder:text-[#A79BC4] focus:shadow-md focus:shadow-violet-200/40 focus:ring-2"
-                style={{ "--tw-ring-color": ACCENT }}
-              />
-              {!searchValue && (
-                <kbd className="pointer-events-none absolute right-3.5 rounded-md border border-violet-100 bg-violet-50 px-1.5 py-0.5 text-[10px] font-semibold text-[#8A82A6]">
-                  ⌘K
-                </kbd>
-              )}
-              {searchValue && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setSearchValue("");
-                    searchRef.current?.focus();
-                  }}
-                  aria-label="Clear search"
-                  className="absolute right-3 flex h-5 w-5 items-center justify-center rounded-full text-[#A79BC4] transition-colors hover:bg-violet-50 hover:text-[#1B0E3D]"
-                >
-                  <X className="h-3.5 w-3.5" />
-                </button>
-              )}
-            </label>
-
-            <AnimatePresence>
-              {searchOpen && (
-                <motion.ul
-                  id="student-search-listbox"
-                  role="listbox"
-                  initial={{ opacity: 0, y: -6, scale: 0.98 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -6, scale: 0.98 }}
-                  transition={SPRING}
-                  className="absolute right-0 top-full z-20 mt-2 max-h-80 w-full overflow-y-auto origin-top-right rounded-2xl border border-violet-100/60 bg-white p-1.5 shadow-xl shadow-violet-900/10"
-                >
-                  {searchResults.length === 0 ? (
-                    <li className="px-3 py-4 text-center text-sm text-[#8A82A6]">No matches for “{searchValue}”</li>
-                  ) : (
-                    Object.entries(
-                      searchResults.reduce((acc, item, idx) => {
-                        const group = item.group || "Go to";
-                        (acc[group] ||= []).push({ ...item, idx });
-                        return acc;
-                      }, {})
-                    ).map(([group, items]) => (
-                      <li key={group}>
-                        <p className="px-3 pb-1 pt-2 text-[10px] font-bold uppercase tracking-wider text-[#A79BC4]">{group}</p>
-                        <ul>
-                          {items.map(({ idx, ...item }) => (
-                            <li key={`${group}-${item.label}`} role="option" aria-selected={idx === activeResultIndex}>
-                              <button
-                                type="button"
-                                onMouseEnter={() => setActiveResultIndex(idx)}
-                                onClick={() => selectSearchResult(item)}
-                                className={`flex w-full items-center gap-2.5 rounded-xl px-3 py-2 text-left text-sm font-medium transition-colors duration-150 ${idx === activeResultIndex ? "bg-violet-50 text-[#1B0E3D]" : "text-[#4A3D66] hover:bg-violet-50"
-                                  }`}
-                              >
-                                <item.icon className="h-4 w-4 shrink-0 text-[#8A82A6]" />
-                                {item.label}
-                              </button>
-                            </li>
-                          ))}
-                        </ul>
-                      </li>
-                    ))
-                  )}
-                </motion.ul>
-              )}
-            </AnimatePresence>
-          </div>
 
           {/* notifications — items are now clickable and mark themselves read */}
           <div ref={notifRef} className="relative shrink-0">

@@ -71,10 +71,11 @@ const STATS = [
  * for an <img src={...} className="h-full w-full object-cover" />
  * once you have real artwork — everything else (size, rotation,
  * stacking, motion) stays the same.
+ *
+ * On mobile, only the 3 center cards (c2, c3, c4) render — the two
+ * outermost cards (c1, c5) are dropped so the stack doesn't get too
+ * cramped/tall on narrow screens. Desktop still shows all 5.
  */
-// offsetY is tiered: outer cards drop lowest, the two cards next to
-// center sit higher, and the featured (center) card drops by 10% of
-// its own height so its bottom edge crops against the container.
 const FAN_CARDS = [
   { id: "c1", from: "#7C3AED", to: "#4C1D95", rotate: -16, offsetY: 65, z: 10 },
   { id: "c2", from: "#A78BFA", to: "#5B21B6", rotate: -8, offsetY: 10, z: 20 },
@@ -82,6 +83,10 @@ const FAN_CARDS = [
   { id: "c4", from: "#8B5CF6", to: "#4338CA", rotate: 8, offsetY: 10, z: 20 },
   { id: "c5", from: "#6D28D9", to: "#2E1065", rotate: 16, offsetY: 65, z: 10 },
 ];
+
+// The 3 center cards shown on mobile.
+const FAN_CARDS_MOBILE = FAN_CARDS.slice(1, 4);
+
 const FAN_CONTAINER_VARIANTS = {
   hidden: {},
   visible: { transition: { staggerChildren: 0.09, delayChildren: 0.15 } },
@@ -98,14 +103,16 @@ const FAN_CARD_VARIANTS = {
   }),
 };
 
-const ImageCardFan = memo(function ImageCardFan({ cards = FAN_CARDS }) {
+const ImageCardFan = memo(function ImageCardFan({ isMobile }) {
+  const cards = isMobile ? FAN_CARDS_MOBILE : FAN_CARDS;
+
   return (
     <motion.div
       initial="hidden"
       whileInView="visible"
       viewport={{ once: true, amount: 0.4 }}
       variants={FAN_CONTAINER_VARIANTS}
-      className="relative mt-12 flex w-full items-end justify-center sm:mt-5"
+      className="relative mt-10 flex w-full items-end justify-center sm:mt-5"
     >
       {cards.map((c, i) => (
         <motion.div
@@ -120,12 +127,20 @@ const ImageCardFan = memo(function ImageCardFan({ cards = FAN_CARDS }) {
           style={{
             zIndex: c.z,
             marginLeft: i === 0 ? 0 : "clamp(-60px, -6vw, -26px)",
-            width: c.featured
-              ? "clamp(118px, 25vw, 320px)"
-              : "clamp(88px, 18vw, 245px)",
-            height: c.featured
-              ? "clamp(178px, 36vw, 445px)"
-              : "clamp(132px, 27vw, 345px)",
+            width: isMobile
+              ? c.featured
+                ? "clamp(150px, 34vw, 220px)"
+                : "clamp(110px, 26vw, 170px)"
+              : c.featured
+                ? "clamp(118px, 25vw, 320px)"
+                : "clamp(88px, 18vw, 245px)",
+            height: isMobile
+              ? c.featured
+                ? "clamp(230px, 52vw, 330px)"
+                : "clamp(170px, 40vw, 250px)"
+              : c.featured
+                ? "clamp(178px, 36vw, 445px)"
+                : "clamp(132px, 27vw, 345px)",
             background: `linear-gradient(160deg, ${c.from} 0%, ${c.to} 100%)`,
           }}
           className="relative flex-none origin-bottom overflow-hidden rounded-[16px] border border-white/15 shadow-[0_24px_52px_-13px_rgba(10,4,26,0.7)] sm:rounded-[28px]"
@@ -168,15 +183,30 @@ const SCRIM_DESKTOP =
  */
 function useIsMobile(breakpoint = 768) {
   const query = `(max-width: ${breakpoint - 1}px)`;
-  const [isMobile, setIsMobile] = useState(() =>
-    typeof window !== "undefined" ? window.matchMedia(query).matches : false
-  );
+  const pointerQuery = "(pointer: coarse)";
+
+  // Requires BOTH a narrow viewport AND a touch/coarse pointer, so
+  // resizing a desktop browser window (or opening dev tools) never
+  // flips this to true — only actual phones/tablets do.
+  const computeIsMobile = () =>
+    typeof window !== "undefined" &&
+    window.matchMedia(query).matches &&
+    window.matchMedia(pointerQuery).matches;
+
+  const [isMobile, setIsMobile] = useState(computeIsMobile);
 
   useEffect(() => {
-    const mql = window.matchMedia(query);
-    const handleChange = (e) => setIsMobile(e.matches);
-    mql.addEventListener("change", handleChange);
-    return () => mql.removeEventListener("change", handleChange);
+    const widthMql = window.matchMedia(query);
+    const pointerMql = window.matchMedia(pointerQuery);
+    const handleChange = () =>
+      setIsMobile(widthMql.matches && pointerMql.matches);
+
+    widthMql.addEventListener("change", handleChange);
+    pointerMql.addEventListener("change", handleChange);
+    return () => {
+      widthMql.removeEventListener("change", handleChange);
+      pointerMql.removeEventListener("change", handleChange);
+    };
   }, [query]);
 
   return isMobile;
@@ -468,7 +498,7 @@ export default function Hero() {
         <HeroBackground isMobile={isMobile} />
 
         {/* content — single straight centered column, no side layout */}
-        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 pb-20 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
+        <div className="relative z-10 mx-auto flex min-h-screen w-full max-w-5xl flex-col items-center justify-center px-4 py-10 pb-6 text-center font-body sm:px-6 sm:py-15 sm:pb-0">
           <span className="relative mt-16 inline-flex rounded-full p-[1.5px] sm:mt-20">
             <span
               aria-hidden
@@ -524,17 +554,16 @@ export default function Hero() {
               />
               <span className="relative">Watch Demo</span>
             </motion.a>
-          </div>F
+          </div>
 
-          <ImageCardFan />
+          <ImageCardFan isMobile={isMobile} />
         </div>
-      </section >
+      </section>
 
       {/* Logo strip — sits right under the hero, naturally in the page flow */}
-      < section id="programs" className="relative w-full py-3" style={{ background: "#F4F2FA" }
-      }>
+      <section id="programs" className="relative w-full py-3" style={{ background: "#F4F2FA" }}>
         <LogoCarousel />
-      </section >
+      </section>
     </>
   );
-}
+} 

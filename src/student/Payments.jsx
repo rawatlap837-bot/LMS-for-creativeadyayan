@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { getFunctions, httpsCallable } from "firebase/functions";
 import { auth, db } from "../firebase/Firebase"; // adjust path to match your project
-import { CreditCard, CheckCircle2, IndianRupee, Loader2, ShieldCheck } from "lucide-react";
+import { CreditCard, CheckCircle2, IndianRupee, Loader2, ShieldCheck, Receipt, X, Printer } from "lucide-react";
 
 const ACCENT = "#5227FF";
 const VIOLET = "#2E1A55";
@@ -35,6 +35,117 @@ function formatDate(d) {
   return d.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function formatDateTime(d) {
+  if (!d) return "—";
+  return d.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
+/** Full-screen receipt modal for a single purchased course. */
+function ReceiptModal({ payment, onClose }) {
+  if (!payment) return null;
+
+  return (
+    <AnimatePresence>
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4 backdrop-blur-sm print:bg-white print:p-0"
+      >
+        <motion.div
+          initial={{ opacity: 0, y: 16, scale: 0.97 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          exit={{ opacity: 0, y: 16, scale: 0.97 }}
+          transition={{ duration: 0.2, ease: "easeOut" }}
+          onClick={(e) => e.stopPropagation()}
+          className="w-full max-w-sm overflow-hidden rounded-3xl bg-white shadow-2xl print:max-w-full print:rounded-none print:shadow-none"
+        >
+          {/* header */}
+          <div
+            className="relative flex items-center justify-between px-6 py-5 print:hidden"
+            style={{ background: `linear-gradient(135deg, ${ACCENT}, ${VIOLET})` }}
+          >
+            <div className="flex items-center gap-2 text-white">
+              <Receipt className="h-4 w-4" />
+              <span className="text-sm font-bold">Payment Receipt</span>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              aria-label="Close receipt"
+              className="flex h-7 w-7 items-center justify-center rounded-full bg-white/15 text-white transition-colors hover:bg-white/25"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          </div>
+
+          {/* body */}
+          <div className="px-6 py-5">
+            <div className="mb-4 flex items-center gap-2 text-emerald-600">
+              <CheckCircle2 className="h-5 w-5" />
+              <span className="text-sm font-bold">Payment successful</span>
+            </div>
+
+            <div className="space-y-2.5 rounded-2xl bg-[#F7F5FC] p-4">
+              <Row label="Course" value={payment.courseName} bold />
+              <Row label="Amount paid" value={`₹${payment.amount?.toLocaleString("en-IN") ?? "—"}`} bold />
+              <Row label="Date & time" value={formatDateTime(payment.paidAt)} />
+              {payment.razorpayPaymentId && <Row label="Payment ID" value={payment.razorpayPaymentId} mono />}
+              {payment.razorpayOrderId && <Row label="Order ID" value={payment.razorpayOrderId} mono />}
+              <Row label="Receipt ID" value={payment.id} mono />
+            </div>
+
+            <p className="mt-4 flex items-center justify-center gap-1.5 text-center text-[10px] text-[#B4ABCB]">
+              <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
+              Verified server-side by Creative Adhyayan.
+            </p>
+
+            <div className="mt-5 flex gap-2 print:hidden">
+              <button
+                type="button"
+                onClick={() => window.print()}
+                className="flex flex-1 items-center justify-center gap-1.5 rounded-full py-2.5 text-xs font-bold text-white transition-transform active:scale-[0.98]"
+                style={{ background: `linear-gradient(135deg, ${ACCENT}, ${VIOLET})` }}
+              >
+                <Printer className="h-3.5 w-3.5" />
+                Print / Save PDF
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex-1 rounded-full bg-[#F0ECFA] py-2.5 text-xs font-bold text-[#1B0E3D] transition-transform active:scale-[0.98]"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </motion.div>
+      </motion.div>
+    </AnimatePresence>
+  );
+}
+
+function Row({ label, value, bold = false, mono = false }) {
+  return (
+    <div className="flex items-start justify-between gap-3 text-xs">
+      <span className="shrink-0 text-[#8A82A6]">{label}</span>
+      <span
+        className={`text-right text-[#1B0E3D] ${bold ? "font-bold" : "font-medium"} ${mono ? "break-all font-mono text-[10px]" : ""
+          }`}
+      >
+        {value || "—"}
+      </span>
+    </div>
+  );
+}
+
 export default function Payments() {
   const [uid, setUid] = useState(null);
   const [userProfile, setUserProfile] = useState({ name: "", email: "", phone: "" });
@@ -49,6 +160,8 @@ export default function Payments() {
 
   const [payingId, setPayingId] = useState(null); // course currently mid-checkout
   const [error, setError] = useState("");
+
+  const [receiptFor, setReceiptFor] = useState(null); // payment row shown in the receipt modal
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
@@ -86,7 +199,7 @@ export default function Payments() {
     return unsub;
   }, [uid]);
 
-  /* purchased courses history — just the paid rows, newest first */
+  /* purchased courses history — course, date, amount, and receipt identifiers */
   useEffect(() => {
     if (!uid) return;
     setHistoryLoading(true);
@@ -97,7 +210,14 @@ export default function Payments() {
         const rows = snap.docs.map((d) => {
           const data = d.data();
           const paidAt = data.paidAt?.toDate ? data.paidAt.toDate() : null;
-          return { id: d.id, courseName: data.courseName, amount: data.amount, paidAt };
+          return {
+            id: d.id,
+            courseName: data.courseName,
+            amount: data.amount,
+            paidAt,
+            razorpayPaymentId: data.razorpayPaymentId || data.razorpay_payment_id || null,
+            razorpayOrderId: data.razorpayOrderId || data.razorpay_order_id || null,
+          };
         });
         rows.sort((a, b) => (b.paidAt || 0) - (a.paidAt || 0));
         setHistory(rows);
@@ -257,7 +377,7 @@ export default function Payments() {
         )}
       </motion.div>
 
-      {/* purchased courses history — just course, date, amount */}
+      {/* purchased courses history — course, date, amount, and a receipt you can open */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={8} className="mt-8">
         <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Purchased courses</h3>
         {historyLoading ? (
@@ -271,19 +391,31 @@ export default function Payments() {
         ) : (
           <div className={`overflow-hidden rounded-3xl bg-white ${cardShadow}`}>
             {history.map((p, i) => (
-              <div
+              <button
                 key={p.id}
-                className={`flex items-center justify-between gap-3 px-5 py-3 ${i !== history.length - 1 ? "border-b border-[#F0ECFA]" : ""}`}
+                type="button"
+                onClick={() => setReceiptFor(p)}
+                className={`flex w-full items-center justify-between gap-3 px-5 py-3 text-left transition-colors hover:bg-[#F7F5FC] ${i !== history.length - 1 ? "border-b border-[#F0ECFA]" : ""
+                  }`}
               >
                 <div className="min-w-0">
                   <p className="truncate text-xs font-bold text-[#1B0E3D]">{p.courseName}</p>
                   <p className="mt-0.5 text-[10px] text-[#8A82A6]">{formatDate(p.paidAt)}</p>
                 </div>
-                <span className="flex shrink-0 items-center gap-1 text-xs font-bold text-[#1B0E3D]">
-                  <IndianRupee className="h-3 w-3" />
-                  {p.amount?.toLocaleString("en-IN")}
-                </span>
-              </div>
+                <div className="flex shrink-0 items-center gap-3">
+                  <span className="flex items-center gap-1 text-xs font-bold text-[#1B0E3D]">
+                    <IndianRupee className="h-3 w-3" />
+                    {p.amount?.toLocaleString("en-IN")}
+                  </span>
+                  <span
+                    className="flex items-center gap-1 rounded-full px-2.5 py-1 text-[10px] font-bold text-white"
+                    style={{ background: `linear-gradient(135deg, ${ACCENT}, ${VIOLET})` }}
+                  >
+                    <Receipt className="h-3 w-3" />
+                    Receipt
+                  </span>
+                </div>
+              </button>
             ))}
           </div>
         )}
@@ -293,6 +425,8 @@ export default function Payments() {
         <ShieldCheck className="h-3.5 w-3.5" />
         Payments are verified server-side and never trusted from the browser.
       </p>
+
+      <ReceiptModal payment={receiptFor} onClose={() => setReceiptFor(null)} />
     </div>
   );
 }

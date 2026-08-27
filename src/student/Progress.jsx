@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
-import { motion } from "framer-motion";
+import { forwardRef, useEffect, useMemo, useState } from "react";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Loader2,
   Lock,
@@ -14,17 +14,27 @@ import {
   Code2,
   PenTool,
   Camera,
+  Megaphone,
+  Cpu,
+  Calculator,
+  Globe,
 } from "lucide-react";
 import { auth, db } from "../firebase/Firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
+import { iconForCategory, estimateLessons } from "../lib/CoursesMeta";
 
 /**
  * Progress — Creative Adhyayan (live Firestore version)
  *
- * Reuses the exact same data model as MyCourses.jsx:
+ * Reuses the exact same data model as MyCourses.jsx, including the
+ * dual-collection catalog: `courses` (long-form) and `shortCourses`
+ * (short-form) are both fetched and merged, and the same field-fallback
+ * pass (title/category/lessons/icon/color) is applied here too — so a
+ * catalog doc missing optional fields never shows "undefined" or 0
+ * lessons the way it used to.
  *
- * courses (collection)
+ * courses / shortCourses (collections)
  *   {courseId}: { title, instructor, category, icon, color, lessons, duration, price }
  *
  * users/{uid}/enrollments (subcollection)
@@ -40,58 +50,65 @@ const AMBER = "#E8A33D";
 const DARK = "#1B0E3D";
 const MUTED = "#8A82A6";
 const CANVAS = "#ECEEF3";
+const DEFAULT_CATEGORY = "Uncategorized";
 
-const ICONS = { Palette, Code2, PenTool, Camera, BookOpen };
+const ICONS = { Palette, Code2, PenTool, Camera, BookOpen, Megaphone, Cpu, Calculator, Globe };
 
-function StatCard({ icon: Icon, label, value, sub, accent }) {
+function TypeBadge({ type }) {
+  const isLong = type === "long";
+  return (
+    <span
+      className="shrink-0 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide"
+      style={{
+        background: isLong ? "#EDE7FB" : "#FDF1DE",
+        color: isLong ? "#5227FF" : "#B4790F",
+      }}
+    >
+      {isLong ? "Long" : "Short"}
+    </span>
+  );
+}
+
+function StatCard({ icon: Icon, label, value, accent }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.18 }}
-      className="flex items-center gap-4 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/[0.03]"
+      className="flex items-center gap-3 rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.03] sm:gap-4 sm:p-5"
     >
       <div
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl sm:h-11 sm:w-11"
         style={{ background: `${accent}1a` }}
       >
-        <Icon className="h-5 w-5" style={{ color: accent }} strokeWidth={2} />
+        <Icon className="h-4.5 w-4.5 sm:h-5 sm:w-5" style={{ color: accent }} strokeWidth={2} />
       </div>
-      <div>
-        <p className="text-xl font-bold leading-none" style={{ color: DARK }}>
+      <div className="min-w-0">
+        <p className="text-lg font-bold leading-none sm:text-xl" style={{ color: DARK }}>
           {value}
         </p>
-        <p className="mt-1.5 text-xs font-medium" style={{ color: MUTED }}>
+        <p className="mt-1.5 truncate text-[11px] font-medium sm:text-xs" style={{ color: MUTED }}>
           {label}
         </p>
-        {sub && (
-          <p className="mt-0.5 text-[11px]" style={{ color: MUTED }}>
-            {sub}
-          </p>
-        )}
       </div>
     </motion.div>
   );
 }
 
 function OverallRing({ percent }) {
-  const size = 132;
-  const stroke = 12;
+  const size = 116;
+  const stroke = 11;
   const radius = (size - stroke) / 2;
   const circumference = 2 * Math.PI * radius;
   const offset = circumference - (percent / 100) * circumference;
 
   return (
-    <div className="relative flex h-[132px] w-[132px] shrink-0 items-center justify-center">
+    <div
+      className="relative flex shrink-0 items-center justify-center"
+      style={{ height: size, width: size }}
+    >
       <svg width={size} height={size} className="-rotate-90">
-        <circle
-          cx={size / 2}
-          cy={size / 2}
-          r={radius}
-          fill="none"
-          stroke={CANVAS}
-          strokeWidth={stroke}
-        />
+        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke={CANVAS} strokeWidth={stroke} />
         <circle
           cx={size / 2}
           cy={size / 2}
@@ -106,10 +123,10 @@ function OverallRing({ percent }) {
         />
       </svg>
       <div className="absolute flex flex-col items-center">
-        <span className="text-2xl font-black" style={{ color: DARK }}>
+        <span className="text-xl font-black sm:text-2xl" style={{ color: DARK }}>
           {percent}%
         </span>
-        <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: MUTED }}>
+        <span className="text-[9px] font-semibold uppercase tracking-wide sm:text-[10px]" style={{ color: MUTED }}>
           Overall
         </span>
       </div>
@@ -117,24 +134,35 @@ function OverallRing({ percent }) {
   );
 }
 
-function CourseProgressRow({ course }) {
+const CourseProgressRow = forwardRef(function CourseProgressRow({ course }, ref) {
   const Icon = ICONS[course.icon] || BookOpen;
   const isDone = course.status === "Completed";
 
   return (
-    <div className="flex items-center gap-4 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/[0.03]">
+    <motion.div
+      ref={ref}
+      layout
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.16 }}
+      className="flex items-center gap-3 rounded-xl bg-white p-3.5 shadow-sm ring-1 ring-black/[0.03] sm:gap-4 sm:p-4"
+    >
       <div
-        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg"
+        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg sm:h-10 sm:w-10"
         style={{ background: `${course.color}1a` }}
       >
-        <Icon className="h-4.5 w-4.5" style={{ color: course.color }} strokeWidth={1.8} />
+        <Icon className="h-4 w-4 sm:h-4.5 sm:w-4.5" style={{ color: course.color }} strokeWidth={1.8} />
       </div>
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
-          <p className="truncate text-sm font-bold" style={{ color: DARK }}>
-            {course.title}
-          </p>
+          <div className="flex min-w-0 items-center gap-1.5">
+            <p className="truncate text-sm font-bold" style={{ color: DARK }}>
+              {course.title}
+            </p>
+            <TypeBadge type={course.type} />
+          </div>
           {isDone ? (
             <span className="flex shrink-0 items-center gap-1 text-[11px] font-bold text-emerald-600">
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -154,30 +182,30 @@ function CourseProgressRow({ course }) {
           />
         </div>
 
-        <p className="mt-1.5 text-[11px]" style={{ color: MUTED }}>
+        <p className="mt-1.5 truncate text-[11px]" style={{ color: MUTED }}>
           {course.lessonsDone}/{course.lessons} lessons · {course.category}
         </p>
       </div>
-    </div>
+    </motion.div>
   );
-}
+});
 
 function CategoryBreakdown({ categories }) {
   if (categories.length === 0) return null;
 
   return (
-    <div className="rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/[0.03]">
+    <div className="rounded-2xl bg-white p-4 shadow-sm ring-1 ring-black/[0.03] sm:p-5">
       <h3 className="mb-4 text-sm font-bold" style={{ color: DARK }}>
         Progress by category
       </h3>
       <div className="flex flex-col gap-4">
         {categories.map((cat) => (
           <div key={cat.name}>
-            <div className="mb-1.5 flex items-center justify-between text-xs">
-              <span className="font-semibold" style={{ color: DARK }}>
+            <div className="mb-1.5 flex items-center justify-between gap-3 text-xs">
+              <span className="truncate font-semibold" style={{ color: DARK }}>
                 {cat.name}
               </span>
-              <span style={{ color: MUTED }}>
+              <span className="shrink-0" style={{ color: MUTED }}>
                 {cat.avgProgress}% avg · {cat.count} course{cat.count > 1 ? "s" : ""}
               </span>
             </div>
@@ -196,44 +224,95 @@ function CategoryBreakdown({ categories }) {
 
 export default function Progress() {
   const [uid, setUid] = useState(undefined); // undefined = checking, null = logged out
-  const [rawCourses, setRawCourses] = useState([]);
+  const [longCourses, setLongCourses] = useState([]);
+  const [shortCourses, setShortCourses] = useState([]);
+  const [longLoaded, setLongLoaded] = useState(false);
+  const [shortLoaded, setShortLoaded] = useState(false);
   const [enrollments, setEnrollments] = useState({});
-  const [loading, setLoading] = useState(true);
+  const [enrollmentsLoaded, setEnrollmentsLoaded] = useState(false);
 
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => setUid(user ? user.uid : null));
     return unsub;
   }, []);
 
+  // Same dual-collection fetch as MyCourses.jsx — long-form courses.
   useEffect(() => {
-    const unsub = onSnapshot(collection(db, "courses"), (snap) => {
-      setRawCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
-    });
+    const unsub = onSnapshot(
+      collection(db, "courses"),
+      (snap) => {
+        setLongCourses(snap.docs.map((d) => ({ type: "long", id: d.id, ...d.data() })));
+        setLongLoaded(true);
+      },
+      (err) => {
+        console.error("[courses] onSnapshot error:", err.code, err.message);
+        setLongLoaded(true);
+      }
+    );
+    return unsub;
+  }, []);
+
+  // Same dual-collection fetch as MyCourses.jsx — short-form courses.
+  useEffect(() => {
+    const unsub = onSnapshot(
+      collection(db, "shortCourses"),
+      (snap) => {
+        setShortCourses(snap.docs.map((d) => ({ type: "short", id: d.id, ...d.data() })));
+        setShortLoaded(true);
+      },
+      (err) => {
+        console.error("[shortCourses] onSnapshot error:", err.code, err.message);
+        setShortLoaded(true);
+      }
+    );
     return unsub;
   }, []);
 
   useEffect(() => {
     if (!uid) {
       setEnrollments({});
-      setLoading(false);
+      setEnrollmentsLoaded(true);
       return;
     }
-    const unsub = onSnapshot(collection(db, "users", uid, "enrollments"), (snap) => {
-      const next = {};
-      snap.docs.forEach((d) => (next[d.id] = d.data()));
-      setEnrollments(next);
-      setLoading(false);
-    });
+    const unsub = onSnapshot(
+      collection(db, "users", uid, "enrollments"),
+      (snap) => {
+        const next = {};
+        snap.docs.forEach((d) => (next[d.id] = d.data()));
+        setEnrollments(next);
+        setEnrollmentsLoaded(true);
+      },
+      (err) => {
+        console.error("[enrollments] onSnapshot error:", err.code, err.message);
+        setEnrollmentsLoaded(true);
+      }
+    );
     return unsub;
   }, [uid]);
 
+  const loading = !longLoaded || !shortLoaded || !enrollmentsLoaded;
+
+  // Merge both catalogs into one list, same as MyCourses.jsx.
+  const rawCourses = useMemo(() => {
+    return [...longCourses, ...shortCourses];
+  }, [longCourses, shortCourses]);
+
+  // Same field-fallback pass as MyCourses.jsx: an incomplete catalog doc
+  // (missing title/category/lessons/icon/color) still renders sane
+  // values instead of "undefined" categories or 0-lesson totals.
   // Only courses the user actually owns count toward progress.
   const purchasedCourses = useMemo(() => {
     return rawCourses
       .map((c) => {
         const e = enrollments[c.id] || {};
+        const category = c.category || DEFAULT_CATEGORY;
         return {
           ...c,
+          title: c.title || category || "Untitled course",
+          category,
+          icon: c.icon || iconForCategory(c.category),
+          color: c.color || "#5227FF",
+          lessons: c.lessons || estimateLessons(c.duration || ""),
           saved: !!e.saved,
           purchased: !!e.purchased,
           lessonsDone: e.lessonsDone || 0,
@@ -293,7 +372,7 @@ export default function Progress() {
 
   if (uid === null) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-2 text-center" style={{ background: CANVAS }}>
+      <div className="flex min-h-screen flex-col items-center justify-center gap-2 px-4 text-center" style={{ background: CANVAS }}>
         <Lock className="h-8 w-8" style={{ color: "#A79BC4" }} />
         <p className="text-sm font-semibold" style={{ color: DARK }}>
           Please log in to view your progress
@@ -311,19 +390,19 @@ export default function Progress() {
   }
 
   return (
-    <div className="min-h-screen p-6" style={{ background: CANVAS }}>
-      <div className="mx-auto flex max-w-6xl flex-col gap-6">
+    <div className="min-h-screen overflow-x-hidden p-4 sm:p-6" style={{ background: CANVAS }}>
+      <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:gap-6">
         <div>
-          <h1 className="text-xl font-bold sm:text-2xl" style={{ color: DARK }}>
+          <h1 className="text-lg font-bold sm:text-2xl" style={{ color: DARK }}>
             My Progress
           </h1>
-          <p className="mt-1 text-sm" style={{ color: MUTED }}>
+          <p className="mt-1 text-xs sm:text-sm" style={{ color: MUTED }}>
             A live look at how far you've come across every course you own.
           </p>
         </div>
 
         {stats.total === 0 ? (
-          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-white py-16 text-center shadow-sm">
+          <div className="flex flex-col items-center justify-center gap-2 rounded-2xl bg-white px-4 py-14 text-center shadow-sm sm:py-16">
             <Target className="h-8 w-8" style={{ color: "#A79BC4" }} />
             <p className="text-sm font-semibold" style={{ color: DARK }}>
               No purchased courses yet
@@ -334,22 +413,22 @@ export default function Progress() {
           </div>
         ) : (
           <>
-            {/* top: ring + stat cards */}
-            <div className="grid grid-cols-1 gap-5 lg:grid-cols-[auto_1fr]">
-              <div className="flex items-center justify-center gap-6 rounded-2xl bg-white p-6 shadow-sm ring-1 ring-black/[0.03] lg:justify-start">
+            {/* top: ring + stat cards — stacked on mobile, side-by-side from md up */}
+            <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-[minmax(0,280px)_1fr]">
+              <div className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/[0.03]">
                 <OverallRing percent={stats.overallPercent} />
-                <div>
+                <div className="min-w-0">
                   <p className="text-sm font-bold" style={{ color: DARK }}>
                     Keep it up!
                   </p>
-                  <p className="mt-1 text-xs" style={{ color: MUTED }}>
-                    {stats.totalLessonsDone} of {stats.totalLessons} lessons completed
-                    across {stats.total} course{stats.total > 1 ? "s" : ""}.
+                  <p className="mt-1 text-xs leading-relaxed" style={{ color: MUTED }}>
+                    {stats.totalLessonsDone} of {stats.totalLessons} lessons done across{" "}
+                    {stats.total} course{stats.total > 1 ? "s" : ""}.
                   </p>
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
                 <StatCard icon={BookOpen} label="Courses owned" value={stats.total} accent={ACCENT} />
                 <StatCard icon={Flame} label="In progress" value={stats.inProgress} accent={AMBER} />
                 <StatCard icon={Award} label="Completed" value={stats.completed} accent="#10B981" />
@@ -366,11 +445,13 @@ export default function Progress() {
                 <TrendingUp className="h-4 w-4" style={{ color: ACCENT }} />
                 Course-by-course progress
               </h3>
-              <div className="flex flex-col gap-3">
-                {sortedCourses.map((course) => (
-                  <CourseProgressRow key={course.id} course={course} />
-                ))}
-              </div>
+              <motion.div layout className="flex flex-col gap-3">
+                <AnimatePresence>
+                  {sortedCourses.map((course) => (
+                    <CourseProgressRow key={course.id} course={course} />
+                  ))}
+                </AnimatePresence>
+              </motion.div>
             </div>
           </>
         )}
