@@ -44,6 +44,22 @@ import {
  * never assume admin. Firestore security rules must forbid a client from
  * writing their own `role` field (see note at the bottom of this file);
  * otherwise this check is decorative, not real access control.
+ *
+ * MOBILE GOOGLE SIGN-IN — WHY PERSISTENCE MATTERS
+ * ─────────────────────────────────────────────────
+ * On mobile (and in-app browsers / narrow viewports) we use
+ * signInWithRedirect instead of signInWithPopup, because popups are
+ * blocked or unreliable on most mobile browsers. signInWithRedirect sends
+ * the browser away to accounts.google.com and back through the
+ * authDomain's /__/auth/handler before landing back here — a multi-hop,
+ * cross-origin round trip. browserSessionPersistence does NOT reliably
+ * survive that round trip on mobile Chrome / Samsung Internet / in-app
+ * browsers: the pending sign-in gets lost, getRedirectResult() resolves
+ * to null, and the user is left stuck on the Google account chooser with
+ * nothing happening after they pick an account. So for the redirect path
+ * specifically, we always force browserLocalPersistence, regardless of
+ * the "Remember me" checkbox. The checkbox still controls persistence for
+ * email/password login and for the popup (desktop) Google path.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -211,18 +227,25 @@ export default function LoginForm() {
     const useRedirect = shouldUseRedirect();
 
     try {
-      await setPersistence(
-        auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
-      );
-
       if (useRedirect) {
+        // signInWithRedirect sends the browser away to accounts.google.com
+        // and back through the authDomain's /__/auth/handler before
+        // landing back here. browserSessionPersistence does not reliably
+        // survive that cross-origin round trip on mobile browsers — this
+        // is what causes "stuck on account chooser, nothing happens after
+        // picking an account." Always force local persistence for the
+        // redirect path, regardless of the "Remember me" checkbox.
+        await setPersistence(auth, browserLocalPersistence);
         // Navigates away from the page — no further code here runs until
         // the effect above picks up getRedirectResult() when we come back.
         await signInWithRedirect(auth, provider);
         return;
       }
 
+      await setPersistence(
+        auth,
+        remember ? browserLocalPersistence : browserSessionPersistence
+      );
       const { user } = await signInWithPopup(auth, provider);
       const dest = await resolvePostLoginRoute(user);
       navigate(dest);

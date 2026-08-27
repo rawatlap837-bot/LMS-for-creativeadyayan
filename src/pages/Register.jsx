@@ -8,6 +8,8 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   browserLocalPersistence,
   setPersistence,
 } from "firebase/auth";
@@ -33,6 +35,18 @@ import {
  * the two auth screens read as one continuous surface, not two different
  * builds. Typing nudges the grid the same way; a strength-appropriate
  * ripple fires on successful account creation.
+ *
+ * MOBILE GOOGLE SIGN-IN — matches LoginForm
+ * ───────────────────────────────────────────
+ * Previously this form always called signInWithPopup, which is blocked
+ * or unreliable on most mobile browsers. It now mirrors LoginForm: on
+ * mobile UAs, in-app browsers, or narrow viewports it uses
+ * signInWithRedirect instead, always with browserLocalPersistence (local
+ * persistence is required for the redirect flow to survive the
+ * cross-origin round trip through accounts.google.com and the
+ * authDomain's /__/auth/handler — session persistence gets lost mid-flow
+ * on mobile). A getRedirectResult() effect picks up the result when the
+ * browser lands back on this page.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -49,6 +63,16 @@ function DotGrid({ className = "", dot = "fill-white/25" }) {
 
 const CUBE_GRID_SIZE = 8;
 
+// Same detection logic as LoginForm — keep these in sync.
+function shouldUseRedirect() {
+  if (typeof navigator === "undefined") return false;
+  const ua = navigator.userAgent || "";
+  const isMobileUA = /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
+  const isInAppBrowser = /FBAN|FBAV|Instagram|Line\//i.test(ua);
+  const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
+  return isMobileUA || isInAppBrowser || isNarrowViewport;
+}
+
 // Same shape as Login's mapper — Firebase error.code -> copy someone can
 // act on, never the raw code.
 function firebaseAuthErrorMessage(error) {
@@ -64,6 +88,8 @@ function firebaseAuthErrorMessage(error) {
     case "auth/popup-closed-by-user":
     case "auth/cancelled-popup-request":
       return ""; // person closed the Google popup themselves — not an error worth surfacing
+    case "auth/popup-blocked":
+      return "Your browser blocked the sign-in popup. Please try again.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
     default:
@@ -103,6 +129,32 @@ export default function RegisterForm() {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
+  }, []);
+
+  // Pick up the result after returning from Google's redirect flow (mobile
+  // path). On desktop this simply resolves to null and does nothing.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const result = await getRedirectResult(auth);
+        if (!cancelled && result?.user) {
+          navigate("/dashboard");
+        }
+      } catch (err) {
+        if (!cancelled) {
+          const message = firebaseAuthErrorMessage(err);
+          if (message) {
+            setStatus("error");
+            setErrorMsg(message);
+          }
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const strength = passwordStrength(form.password);
@@ -170,9 +222,24 @@ export default function RegisterForm() {
   const handleGoogleSignIn = async () => {
     setErrorMsg("");
     setGoogleLoading(true);
+
+    const provider = new GoogleAuthProvider();
+
     try {
+      // Local persistence is required for both paths here: it's the
+      // default for new accounts (see handleSubmit above), and it's
+      // required for the redirect flow to survive the cross-origin round
+      // trip through accounts.google.com and back on mobile.
       await setPersistence(auth, browserLocalPersistence);
-      await signInWithPopup(auth, new GoogleAuthProvider());
+
+      if (shouldUseRedirect()) {
+        // Navigates away from the page — no further code here runs until
+        // the effect above picks up getRedirectResult() when we come back.
+        await signInWithRedirect(auth, provider);
+        return;
+      }
+
+      await signInWithPopup(auth, provider);
       navigate("/dashboard");
     } catch (err) {
       const message = firebaseAuthErrorMessage(err);
@@ -181,6 +248,8 @@ export default function RegisterForm() {
         setErrorMsg(message);
       }
     } finally {
+      // On the redirect path the page is already navigating away, so this
+      // only matters for the popup path (desktop).
       setGoogleLoading(false);
     }
   };
