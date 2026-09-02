@@ -60,6 +60,11 @@ import {
  * specifically, we always force browserLocalPersistence, regardless of
  * the "Remember me" checkbox. The checkbox still controls persistence for
  * email/password login and for the popup (desktop) Google path.
+ *
+ * TEMP DEBUG (remove once mobile Google sign-in is confirmed fixed):
+ * The getRedirectResult effect below fires window.alert() so we can see
+ * exactly what happens on a real phone without needing USB debugging /
+ * remote DevTools. Delete the alert(...) lines once this is resolved.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -147,17 +152,26 @@ export default function LoginForm() {
 
   // Pick up the result after returning from Google's redirect flow (mobile
   // path). On desktop this simply resolves to null and does nothing.
+  //
+  // TEMP DEBUG: alert() calls added below so we can see what happens on a
+  // real phone. Remove them once mobile Google sign-in is confirmed fixed.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (!cancelled && result?.user) {
+        if (cancelled) return;
+
+        if (result?.user) {
+          alert("Success: " + result.user.email);
           const dest = await resolvePostLoginRoute(result.user);
           navigate(dest);
+        } else {
+          alert("getRedirectResult returned no user");
         }
       } catch (err) {
         if (!cancelled) {
+          alert("Redirect error: " + err.code + " - " + err.message);
           const message = firebaseAuthErrorMessage(err);
           if (message) {
             setStatus("error");
