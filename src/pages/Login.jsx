@@ -26,45 +26,32 @@ import {
 
 /**
  * Login — Creative Adhyayan
- * Same brand system as the rest of the LMS: deep violet (#2E1A55) + indigo
- * (#6D3FC0) + amber (#E8A33D). Split-screen layout: dark brand panel on the
- * left (desktop), clean white form card on the right.
  *
  * ROLE-BASED ROUTING
  * ───────────────────
- * This is still one login form for everyone — students and admins use the
- * same email/password (or Google) sign-in. After Firebase confirms who the
- * person IS, we separately look up WHAT they are allowed to do:
+ * users/{uid} → { role: "admin" | "student", ... }
+ * Fails SAFE to /dashboard if the doc/field is missing or unreadable.
  *
- *   users/{uid}  →  { role: "admin" | "student", ... }
+ * MOBILE GOOGLE SIGN-IN
+ * ───────────────────────
+ * On mobile / in-app browsers / narrow viewports we use signInWithRedirect
+ * instead of signInWithPopup (popups are blocked/unreliable on mobile).
+ * We always force browserLocalPersistence for the redirect path — it must
+ * survive the cross-origin round trip through accounts.google.com and the
+ * authDomain's /__/auth/handler.
  *
- * That Firestore document is the source of truth. A student is sent to
- * /dashboard; an admin is sent to /admin/dashboard. If the role lookup
- * fails or the field is missing, we fail SAFE and send them to /dashboard —
- * never assume admin. Firestore security rules must forbid a client from
- * writing their own `role` field (see note at the bottom of this file);
- * otherwise this check is decorative, not real access control.
- *
- * MOBILE GOOGLE SIGN-IN — WHY PERSISTENCE MATTERS
- * ─────────────────────────────────────────────────
- * On mobile (and in-app browsers / narrow viewports) we use
- * signInWithRedirect instead of signInWithPopup, because popups are
- * blocked or unreliable on most mobile browsers. signInWithRedirect sends
- * the browser away to accounts.google.com and back through the
- * authDomain's /__/auth/handler before landing back here — a multi-hop,
- * cross-origin round trip. browserSessionPersistence does NOT reliably
- * survive that round trip on mobile Chrome / Samsung Internet / in-app
- * browsers: the pending sign-in gets lost, getRedirectResult() resolves
- * to null, and the user is left stuck on the Google account chooser with
- * nothing happening after they pick an account. So for the redirect path
- * specifically, we always force browserLocalPersistence, regardless of
- * the "Remember me" checkbox. The checkbox still controls persistence for
- * email/password login and for the popup (desktop) Google path.
- *
- * TEMP DEBUG (remove once mobile Google sign-in is confirmed fixed):
- * The getRedirectResult effect below fires window.alert() so we can see
- * exactly what happens on a real phone without needing USB debugging /
- * remote DevTools. Delete the alert(...) lines once this is resolved.
+ * IMPORTANT — this flow only works if:
+ *   1. Your host serves index.html for every route (SPA fallback). On
+ *      Vercel that means a vercel.json with a catch-all rewrite. Without
+ *      it, the hard page-reload that Google sends the browser back to
+ *      after redirect sign-in will 404, and this code never even runs.
+ *   2. Your Vercel domain is in Firebase Console → Authentication →
+ *      Settings → Authorized domains.
+ *   3. Your Vercel domain is in Google Cloud Console → Credentials →
+ *      OAuth Client → Authorized JavaScript origins, and the Firebase
+ *      authDomain's /__/auth/handler is in Authorized redirect URIs.
+ *   4. You're not testing inside an in-app browser (Instagram/FB/etc) —
+ *      Google blocks OAuth there regardless of code.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -89,6 +76,7 @@ function shouldUseRedirect() {
   const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
   return isMobileUA || isInAppBrowser || isNarrowViewport;
 }
+
 function firebaseAuthErrorMessage(error) {
   switch (error?.code) {
     case "auth/invalid-email":
@@ -108,6 +96,8 @@ function firebaseAuthErrorMessage(error) {
       return "Your browser blocked the sign-in popup. Please try again.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
+    case "auth/unauthorized-domain":
+      return "This domain isn't authorized for sign-in yet. Contact support.";
     default:
       return "Something went wrong. Please try again.";
   }
@@ -140,10 +130,6 @@ export default function LoginForm() {
   const cubesRef = useRef(null);
   const navigate = useNavigate();
 
-  // Scroll to the very top whenever this page mounts — e.g. when the user
-  // clicks "Log in" in the navbar from somewhere scrolled down on another
-  // page. The documentElement/body fallback covers older/mobile Safari,
-  // where window.scrollTo alone can be unreliable right after a route change.
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
@@ -152,34 +138,42 @@ export default function LoginForm() {
 
   // Pick up the result after returning from Google's redirect flow (mobile
   // path). On desktop this simply resolves to null and does nothing.
-  //
-  // TEMP DEBUG: alert() calls added below so we can see what happens on a
-  // real phone. Remove them once mobile Google sign-in is confirmed fixed.
+  // getRedirectResult() can only be consumed ONCE per redirect — don't
+  // call it more than once across the app (e.g. also in App.jsx), or the
+  // second caller will always get null.
   useEffect(() => {
     let cancelled = false;
+
+    // Surface a visible "signing you in…" state immediately if we suspect
+    // we just came back from a redirect, so the screen isn't blank/stuck
+    // while getRedirectResult resolves.
+    if (shouldUseRedirect()) {
+      setGoogleLoading(true);
+    }
+
     (async () => {
       try {
         const result = await getRedirectResult(auth);
         if (cancelled) return;
 
         if (result?.user) {
-          alert("Success: " + result.user.email);
           const dest = await resolvePostLoginRoute(result.user);
           navigate(dest);
-        } else {
-          alert("getRedirectResult returned no user");
+          return;
         }
       } catch (err) {
         if (!cancelled) {
-          alert("Redirect error: " + err.code + " - " + err.message);
           const message = firebaseAuthErrorMessage(err);
           if (message) {
             setStatus("error");
             setErrorMsg(message);
           }
         }
+      } finally {
+        if (!cancelled) setGoogleLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -187,10 +181,7 @@ export default function LoginForm() {
   }, []);
 
   const pulseCubesFor = (fieldName, value) => {
-    const col = Math.min(
-      CUBE_GRID_SIZE - 1,
-      value.length % (CUBE_GRID_SIZE + 3)
-    );
+    const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
     const row = fieldName === "email" ? 1.5 : 4.5;
     cubesRef.current?.pulse(row, col);
   };
@@ -218,10 +209,7 @@ export default function LoginForm() {
     setStatus("submitting");
     cubesRef.current?.ripple(2.5, 2.5);
     try {
-      await setPersistence(
-        auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
-      );
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const { user } = await signInWithEmailAndPassword(auth, form.email, form.password);
       const dest = await resolvePostLoginRoute(user);
       setStatus("idle");
@@ -242,24 +230,15 @@ export default function LoginForm() {
 
     try {
       if (useRedirect) {
-        // signInWithRedirect sends the browser away to accounts.google.com
-        // and back through the authDomain's /__/auth/handler before
-        // landing back here. browserSessionPersistence does not reliably
-        // survive that cross-origin round trip on mobile browsers — this
-        // is what causes "stuck on account chooser, nothing happens after
-        // picking an account." Always force local persistence for the
-        // redirect path, regardless of the "Remember me" checkbox.
+        // Always local persistence for the redirect path — it must
+        // survive the cross-origin round trip through accounts.google.com
+        // and the authDomain's /__/auth/handler, regardless of "Remember me".
         await setPersistence(auth, browserLocalPersistence);
-        // Navigates away from the page — no further code here runs until
-        // the effect above picks up getRedirectResult() when we come back.
         await signInWithRedirect(auth, provider);
-        return;
+        return; // page is navigating away; nothing else runs here
       }
 
-      await setPersistence(
-        auth,
-        remember ? browserLocalPersistence : browserSessionPersistence
-      );
+      await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const { user } = await signInWithPopup(auth, provider);
       const dest = await resolvePostLoginRoute(user);
       navigate(dest);
@@ -270,8 +249,6 @@ export default function LoginForm() {
         setErrorMsg(message);
       }
     } finally {
-      // On the redirect path the page is already navigating away, so this
-      // only matters for the popup path (desktop).
       setGoogleLoading(false);
     }
   };
@@ -338,10 +315,7 @@ export default function LoginForm() {
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
               <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                >
+                <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Email
                 </label>
                 <div className="relative">
@@ -362,10 +336,7 @@ export default function LoginForm() {
 
               <div>
                 <div className="mb-1.5 flex items-center justify-between">
-                  <label
-                    htmlFor="password"
-                    className="block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                  >
+                  <label htmlFor="password" className="block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                     Password
                   </label>
                   <a href="/forgot-password" className="text-xs font-semibold text-[#6D3FC0] hover:underline">
@@ -427,11 +398,7 @@ export default function LoginForm() {
                   {status === "submitting" ? "Logging in…" : "Log in"}
                 </span>
                 <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#2E1A55] transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:rotate-45">
-                  {status === "submitting" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
-                  )}
+                  {status === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" strokeWidth={2.5} />}
                 </span>
               </button>
             </form>
@@ -452,22 +419,10 @@ export default function LoginForm() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <svg className="h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.55-5.17 3.55-8.66Z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.87-3c-1.08.72-2.46 1.15-4.08 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.09A12 12 0 0 0 12 24Z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.27a12 12 0 0 0 0 10.76l4-3.09Z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z"
-                  />
+                  <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.55-5.17 3.55-8.66Z" />
+                  <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.87-3c-1.08.72-2.46 1.15-4.08 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.09A12 12 0 0 0 12 24Z" />
+                  <path fill="#FBBC05" d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.27a12 12 0 0 0 0 10.76l4-3.09Z" />
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z" />
                 </svg>
               )}
               {googleLoading ? "Signing in…" : "Continue with Google"}
@@ -475,14 +430,9 @@ export default function LoginForm() {
 
             <p className="mt-8 text-center text-xs text-[#A79BC4]">
               By logging in, you agree to our{" "}
-              <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">
-                Terms
-              </a>{" "}
+              <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">Terms</a>{" "}
               and{" "}
-              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">
-                Privacy Policy
-              </a>
-              .
+              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
             </p>
           </motion.div>
         </div>
@@ -507,7 +457,7 @@ export default function LoginForm() {
  *                     && request.resource.data.role == resource.data.role;
  *      }
  *
- * 3. Route guard: wrap AdminLayout in a RequireAdmin component (see
- *    RequireAdmin.jsx) so someone can't just type /admin/dashboard into
- *    the URL bar and get in without the role check.
+ * 3. Route guard: wrap AdminLayout in a RequireAdmin component so someone
+ *    can't just type /admin into the URL bar and get in without the role
+ *    check.
  */

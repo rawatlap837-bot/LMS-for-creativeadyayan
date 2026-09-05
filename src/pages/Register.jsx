@@ -27,26 +27,12 @@ import {
 
 /**
  * Register — Creative Adhyayan
- * Same brand system + layout as LoginForm: deep violet (#2E1A55) + indigo
- * (#6D3FC0) + amber (#E8A33D), split-screen with the dark brand panel on
- * the left (desktop) and a white form card on the right.
  *
- * Reuses the exact same `Cubes` component/config as the login screen so
- * the two auth screens read as one continuous surface, not two different
- * builds. Typing nudges the grid the same way; a strength-appropriate
- * ripple fires on successful account creation.
- *
- * MOBILE GOOGLE SIGN-IN — matches LoginForm
- * ───────────────────────────────────────────
- * Previously this form always called signInWithPopup, which is blocked
- * or unreliable on most mobile browsers. It now mirrors LoginForm: on
- * mobile UAs, in-app browsers, or narrow viewports it uses
- * signInWithRedirect instead, always with browserLocalPersistence (local
- * persistence is required for the redirect flow to survive the
- * cross-origin round trip through accounts.google.com and the
- * authDomain's /__/auth/handler — session persistence gets lost mid-flow
- * on mobile). A getRedirectResult() effect picks up the result when the
- * browser lands back on this page.
+ * Same mobile Google sign-in handling as LoginForm — keep the two in
+ * sync. See the note in LoginForm.jsx about the requirements for the
+ * redirect flow to actually work in production (SPA fallback rewrite on
+ * your host, authorized domains in Firebase, authorized origins/redirect
+ * URIs in Google Cloud).
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -73,8 +59,6 @@ function shouldUseRedirect() {
   return isMobileUA || isInAppBrowser || isNarrowViewport;
 }
 
-// Same shape as Login's mapper — Firebase error.code -> copy someone can
-// act on, never the raw code.
 function firebaseAuthErrorMessage(error) {
   switch (error?.code) {
     case "auth/email-already-in-use":
@@ -87,11 +71,13 @@ function firebaseAuthErrorMessage(error) {
       return "Too many attempts. Please wait a moment and try again.";
     case "auth/popup-closed-by-user":
     case "auth/cancelled-popup-request":
-      return ""; // person closed the Google popup themselves — not an error worth surfacing
+      return "";
     case "auth/popup-blocked":
       return "Your browser blocked the sign-in popup. Please try again.";
     case "auth/network-request-failed":
       return "Network error. Check your connection and try again.";
+    case "auth/unauthorized-domain":
+      return "This domain isn't authorized for sign-in yet. Contact support.";
     default:
       return "Something went wrong. Please try again.";
   }
@@ -104,7 +90,7 @@ function passwordStrength(password) {
   if (/[A-Z]/.test(password)) score++;
   if (/[0-9]/.test(password)) score++;
   if (/[^A-Za-z0-9]/.test(password)) score++;
-  return score; // 0–4
+  return score;
 }
 
 const STRENGTH_LABEL = ["Too short", "Weak", "Okay", "Good", "Strong"];
@@ -114,32 +100,36 @@ export default function RegisterForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
   const [agreed, setAgreed] = useState(false);
-  const [status, setStatus] = useState("idle"); // idle | submitting | error
+  const [status, setStatus] = useState("idle");
   const [errorMsg, setErrorMsg] = useState("");
   const [googleLoading, setGoogleLoading] = useState(false);
   const cubesRef = useRef(null);
   const navigate = useNavigate();
 
-  // Scroll to the very top whenever this page mounts — e.g. when the user
-  // clicks "Register" / "Create account" in the navbar from somewhere
-  // scrolled down on another page. The documentElement/body fallback
-  // covers older/mobile Safari, where window.scrollTo alone can be
-  // unreliable right after a route change.
   useEffect(() => {
     window.scrollTo(0, 0);
     document.documentElement.scrollTop = 0;
     document.body.scrollTop = 0;
   }, []);
 
-  // Pick up the result after returning from Google's redirect flow (mobile
-  // path). On desktop this simply resolves to null and does nothing.
+  // Pick up the result after returning from Google's redirect flow.
+  // getRedirectResult() can only be consumed ONCE per redirect app-wide —
+  // this component and LoginForm are the only two callers; don't add a
+  // third (e.g. in App.jsx) or one of them will always see null.
   useEffect(() => {
     let cancelled = false;
+
+    if (shouldUseRedirect()) {
+      setGoogleLoading(true);
+    }
+
     (async () => {
       try {
         const result = await getRedirectResult(auth);
-        if (!cancelled && result?.user) {
+        if (cancelled) return;
+        if (result?.user) {
           navigate("/dashboard");
+          return;
         }
       } catch (err) {
         if (!cancelled) {
@@ -149,8 +139,11 @@ export default function RegisterForm() {
             setErrorMsg(message);
           }
         }
+      } finally {
+        if (!cancelled) setGoogleLoading(false);
       }
     })();
+
     return () => {
       cancelled = true;
     };
@@ -159,14 +152,8 @@ export default function RegisterForm() {
 
   const strength = passwordStrength(form.password);
 
-  // Same field -> row/col mapping as Login, extended for the extra fields:
-  // name nudges the top rows, email the upper-middle, password/confirm the
-  // lower rows — top-to-bottom mirrors the form's own reading order.
   const pulseCubesFor = (fieldName, value) => {
-    const col = Math.min(
-      CUBE_GRID_SIZE - 1,
-      value.length % (CUBE_GRID_SIZE + 3)
-    );
+    const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
     const rowByField = { name: 0.5, email: 2.5, password: 4.5, confirm: 6.5 };
     cubesRef.current?.pulse(rowByField[fieldName] ?? 3.5, col);
   };
@@ -204,8 +191,6 @@ export default function RegisterForm() {
     setStatus("submitting");
     cubesRef.current?.ripple(3.5, 3.5);
     try {
-      // New accounts stay signed in locally by default (no "remember me"
-      // toggle here — a person who just registered expects to stay in).
       await setPersistence(auth, browserLocalPersistence);
       const cred = await createUserWithEmailAndPassword(auth, form.email, form.password);
       if (form.name.trim()) {
@@ -226,15 +211,9 @@ export default function RegisterForm() {
     const provider = new GoogleAuthProvider();
 
     try {
-      // Local persistence is required for both paths here: it's the
-      // default for new accounts (see handleSubmit above), and it's
-      // required for the redirect flow to survive the cross-origin round
-      // trip through accounts.google.com and back on mobile.
       await setPersistence(auth, browserLocalPersistence);
 
       if (shouldUseRedirect()) {
-        // Navigates away from the page — no further code here runs until
-        // the effect above picks up getRedirectResult() when we come back.
         await signInWithRedirect(auth, provider);
         return;
       }
@@ -248,8 +227,6 @@ export default function RegisterForm() {
         setErrorMsg(message);
       }
     } finally {
-      // On the redirect path the page is already navigating away, so this
-      // only matters for the popup path (desktop).
       setGoogleLoading(false);
     }
   };
@@ -257,7 +234,6 @@ export default function RegisterForm() {
   return (
     <div className="relative min-h-screen bg-[#F8F6FC]">
       <section className="relative z-10 flex min-h-screen text-[#1F1533]">
-        {/* ================= LEFT — BRAND PANEL (desktop only) ================= */}
         <div className="relative hidden w-[45%] shrink-0 overflow-hidden bg-gradient-to-br from-[#1B0F38]/95 via-[#2E1A55]/95 to-[#3A2170]/95 lg:flex lg:flex-col lg:justify-between lg:p-12">
           <DotGrid className="pointer-events-none absolute right-6 top-8" />
           <div
@@ -283,9 +259,6 @@ export default function RegisterForm() {
               and track your progress from day one.
             </p>
 
-            {/* Same Cubes instance/config as LoginForm — identical grid
-                size, colors, and ref API — so the two screens feel like
-                one continuous brand panel. */}
             <div className="mt-7 w-full">
               <Cubes
                 ref={cubesRef}
@@ -303,7 +276,6 @@ export default function RegisterForm() {
           </motion.div>
         </div>
 
-        {/* ================= RIGHT — FORM ================= */}
         <div className="flex flex-1 items-center justify-center px-3 py-24">
           <motion.div
             initial={{ opacity: 0, y: 16 }}
@@ -311,7 +283,6 @@ export default function RegisterForm() {
             transition={{ duration: 0.5, ease: "easeOut" }}
             className="w-full max-w-sm rounded-3xl bg-white/90 p-8 shadow-xl shadow-violet-900/10 backdrop-blur-sm lg:bg-transparent lg:p-0 lg:shadow-none lg:backdrop-blur-0"
           >
-            {/* mobile-only brand mark */}
             <h2 className="text-3xl font-semibold tracking-tight">Create your account</h2>
             <p className="mt-2 text-sm text-[#6b5f87]">
               Already have one?{" "}
@@ -321,12 +292,8 @@ export default function RegisterForm() {
             </p>
 
             <form onSubmit={handleSubmit} className="mt-8 space-y-5">
-              {/* name */}
               <div>
-                <label
-                  htmlFor="name"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                >
+                <label htmlFor="name" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Full name
                 </label>
                 <div className="relative">
@@ -345,12 +312,8 @@ export default function RegisterForm() {
                 </div>
               </div>
 
-              {/* email */}
               <div>
-                <label
-                  htmlFor="email"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                >
+                <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Email
                 </label>
                 <div className="relative">
@@ -369,12 +332,8 @@ export default function RegisterForm() {
                 </div>
               </div>
 
-              {/* password */}
               <div>
-                <label
-                  htmlFor="password"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                >
+                <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Password
                 </label>
                 <div className="relative">
@@ -400,7 +359,6 @@ export default function RegisterForm() {
                   </button>
                 </div>
 
-                {/* strength meter — only once they've started typing */}
                 {form.password && (
                   <div className="mt-2">
                     <div className="flex gap-1">
@@ -408,26 +366,17 @@ export default function RegisterForm() {
                         <span
                           key={i}
                           className="h-1 flex-1 rounded-full transition-colors"
-                          style={{
-                            background:
-                              i < strength ? "#6D3FC0" : "rgba(109, 63, 192, 0.12)",
-                          }}
+                          style={{ background: i < strength ? "#6D3FC0" : "rgba(109, 63, 192, 0.12)" }}
                         />
                       ))}
                     </div>
-                    <p className="mt-1 text-[11px] font-medium text-[#8A7CA8]">
-                      {STRENGTH_LABEL[strength]}
-                    </p>
+                    <p className="mt-1 text-[11px] font-medium text-[#8A7CA8]">{STRENGTH_LABEL[strength]}</p>
                   </div>
                 )}
               </div>
 
-              {/* confirm password */}
               <div>
-                <label
-                  htmlFor="confirm"
-                  className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]"
-                >
+                <label htmlFor="confirm" className="mb-1.5 block text-xs font-semibold uppercase tracking-wide text-[#4A3D66]">
                   Confirm password
                 </label>
                 <div className="relative">
@@ -457,7 +406,6 @@ export default function RegisterForm() {
                 </div>
               </div>
 
-              {/* terms */}
               <label className="flex select-none items-start gap-2 text-sm text-[#4A3D66]">
                 <input
                   type="checkbox"
@@ -467,17 +415,12 @@ export default function RegisterForm() {
                 />
                 <span>
                   I agree to the{" "}
-                  <a href="/terms" className="font-semibold text-[#6D3FC0] hover:underline">
-                    Terms
-                  </a>{" "}
+                  <a href="/terms" className="font-semibold text-[#6D3FC0] hover:underline">Terms</a>{" "}
                   and{" "}
-                  <a href="/privacy" className="font-semibold text-[#6D3FC0] hover:underline">
-                    Privacy Policy
-                  </a>
+                  <a href="/privacy" className="font-semibold text-[#6D3FC0] hover:underline">Privacy Policy</a>
                 </span>
               </label>
 
-              {/* error */}
               {status === "error" && errorMsg && (
                 <motion.p
                   initial={{ opacity: 0, y: -4 }}
@@ -488,7 +431,6 @@ export default function RegisterForm() {
                 </motion.p>
               )}
 
-              {/* submit — same two-part pill as Login */}
               <button
                 type="submit"
                 disabled={status === "submitting"}
@@ -500,23 +442,17 @@ export default function RegisterForm() {
                   {status === "submitting" ? "Creating account…" : "Create account"}
                 </span>
                 <span className="relative z-10 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-[#2E1A55] transition-transform duration-300 group-hover/btn:translate-x-0.5 group-hover/btn:rotate-45">
-                  {status === "submitting" ? (
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  ) : (
-                    <ArrowRight className="h-4 w-4" strokeWidth={2.5} />
-                  )}
+                  {status === "submitting" ? <Loader2 className="h-4 w-4 animate-spin" /> : <ArrowRight className="h-4 w-4" strokeWidth={2.5} />}
                 </span>
               </button>
             </form>
 
-            {/* divider */}
             <div className="my-7 flex items-center gap-3">
               <span className="h-px flex-1 bg-violet-100" />
               <span className="text-xs font-medium uppercase tracking-wide text-[#A79BC4]">or</span>
               <span className="h-px flex-1 bg-violet-100" />
             </div>
 
-            {/* social sign-up */}
             <button
               type="button"
               onClick={handleGoogleSignIn}
@@ -527,22 +463,10 @@ export default function RegisterForm() {
                 <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
                 <svg className="h-4 w-4" viewBox="0 0 24 24">
-                  <path
-                    fill="#4285F4"
-                    d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.55-5.17 3.55-8.66Z"
-                  />
-                  <path
-                    fill="#34A853"
-                    d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.87-3c-1.08.72-2.46 1.15-4.08 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.09A12 12 0 0 0 12 24Z"
-                  />
-                  <path
-                    fill="#FBBC05"
-                    d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.27a12 12 0 0 0 0 10.76l4-3.09Z"
-                  />
-                  <path
-                    fill="#EA4335"
-                    d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z"
-                  />
+                  <path fill="#4285F4" d="M23.49 12.27c0-.79-.07-1.54-.2-2.27H12v4.3h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.87c2.27-2.09 3.55-5.17 3.55-8.66Z" />
+                  <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.9l-3.87-3c-1.08.72-2.46 1.15-4.08 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.09A12 12 0 0 0 12 24Z" />
+                  <path fill="#FBBC05" d="M5.27 14.29a7.2 7.2 0 0 1 0-4.58V6.62H1.27a12 12 0 0 0 0 10.76l4-3.09Z" />
+                  <path fill="#EA4335" d="M12 4.75c1.77 0 3.35.61 4.6 1.8l3.42-3.42C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.09C6.22 6.86 8.87 4.75 12 4.75Z" />
                 </svg>
               )}
               {googleLoading ? "Signing up…" : "Continue with Google"}
@@ -550,14 +474,9 @@ export default function RegisterForm() {
 
             <p className="mt-8 text-center text-xs text-[#A79BC4]">
               By creating an account, you agree to our{" "}
-              <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">
-                Terms
-              </a>{" "}
+              <a href="/terms" className="font-medium text-[#6D3FC0] hover:underline">Terms</a>{" "}
               and{" "}
-              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">
-                Privacy Policy
-              </a>
-              .
+              <a href="/privacy" className="font-medium text-[#6D3FC0] hover:underline">Privacy Policy</a>.
             </p>
           </motion.div>
         </div>
