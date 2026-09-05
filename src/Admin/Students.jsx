@@ -7,6 +7,7 @@ import { db } from "../firebase/Firebase";
 import {
   AT, Pill, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal,
 } from "./AdminUI";
+import { TableRowSkeleton } from "./Skeleton"; // adjust path if needed
 
 // Firestore collection names — change if yours differ
 const STUDENTS_COLLECTION = "students";
@@ -25,12 +26,11 @@ export default function Students() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [query, setQuery] = useState("");
-  const [modal, setModal] = useState(null); // null | 'new' | student (edit)
-  const [viewing, setViewing] = useState(null); // student being viewed in detail
+  const [modal, setModal] = useState(null);
+  const [viewing, setViewing] = useState(null);
   const [confirmDelete, setConfirmDelete] = useState(null);
   const [saving, setSaving] = useState(false);
 
-  // Live student list — table (and detail view) update instantly on any change
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, STUDENTS_COLLECTION),
@@ -46,7 +46,6 @@ export default function Students() {
     return () => unsub();
   }, []);
 
-  // Live payments — used to show each student's payment history in the detail view
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, PAYMENTS_COLLECTION),
@@ -149,11 +148,7 @@ export default function Students() {
           </thead>
           <tbody>
             {loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-6 text-center text-sm" style={{ color: AT.sub }}>
-                  Loading students…
-                </td>
-              </tr>
+              Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} columns={5} />)
             ) : (
               filtered.map((s) => (
                 <tr
@@ -253,7 +248,6 @@ function StudentForm({ initial, saving, onCancel, onSave }) {
   );
 }
 
-// Full-record view — everything about one student, plus their payment history
 function StudentDetail({ student, payments, onClose, onEdit, onDelete }) {
   const enrolled = toDate(student.createdAt);
   const totalPaid = payments
@@ -304,11 +298,7 @@ function StudentDetail({ student, payments, onClose, onEdit, onDelete }) {
         </div>
 
         <div className="flex justify-between gap-2 pt-2">
-          <button
-            onClick={onDelete}
-            className="text-sm"
-            style={{ color: AT.danger }}
-          >
+          <button onClick={onDelete} className="text-sm" style={{ color: AT.danger }}>
             Remove student
           </button>
           <div className="flex gap-2">

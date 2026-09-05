@@ -2,10 +2,11 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { auth, db } from "../firebase/Firebase"; // adjust path to match your project
+import { auth, db } from "../firebase/Firebase";
 import { Award, Download, Eye, X, Lock } from "lucide-react";
 import { watchForCourseCompletion, listenToCertificates } from "../services/Certificates";
 import { downloadCertificatePdf } from "../services/Certificatepdf";
+import { Skeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
@@ -29,7 +30,6 @@ export default function Certificates() {
 
   const [previewCert, setPreviewCert] = useState(null);
 
-  /* auth */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setUid(user?.uid ?? null);
@@ -38,14 +38,12 @@ export default function Certificates() {
     return unsub;
   }, []);
 
-  /* auto-issue certificates the instant a course actually hits 100% */
   useEffect(() => {
     if (!uid) return;
     const unsub = watchForCourseCompletion(uid, studentName);
     return unsub;
   }, [uid, studentName]);
 
-  /* live list of earned certificates */
   useEffect(() => {
     if (!uid) return;
     setCertsLoading(true);
@@ -56,7 +54,6 @@ export default function Certificates() {
     return unsub;
   }, [uid]);
 
-  /* courses still in progress (< 100%) so users can see what's left to unlock */
   useEffect(() => {
     if (!uid) return;
     setProgressLoading(true);
@@ -96,11 +93,25 @@ export default function Certificates() {
         </p>
       </motion.div>
 
-      {/* earned certificates */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className="mb-4">
         {loading ? (
-          <div className={`rounded-3xl bg-white p-10 text-center ${cardShadow}`}>
-            <p className="text-xs text-[#A79BC4]">Loading your certificates…</p>
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {Array.from({ length: 2 }).map((_, i) => (
+              <div key={i} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
+                <div className="flex items-start gap-3">
+                  <Skeleton className="h-11 w-11 rounded-2xl shrink-0" />
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <Skeleton className="h-3 w-3/4" />
+                    <Skeleton className="h-2 w-1/2" />
+                    <Skeleton className="h-2 w-1/3" />
+                  </div>
+                </div>
+                <div className="mt-4 flex gap-2">
+                  <Skeleton className="h-8 flex-1 rounded-full" />
+                  <Skeleton className="h-8 flex-1 rounded-full" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : certificates.length === 0 ? (
           <div className={`rounded-3xl bg-white p-10 text-center ${cardShadow}`}>
@@ -167,7 +178,6 @@ export default function Certificates() {
         )}
       </motion.div>
 
-      {/* still-locked / in-progress courses */}
       {!loading && inProgress.length > 0 && (
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={6} className="mt-6">
           <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Still in progress</h3>
@@ -192,7 +202,6 @@ export default function Certificates() {
         </motion.div>
       )}
 
-      {/* preview modal */}
       {previewCert && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"

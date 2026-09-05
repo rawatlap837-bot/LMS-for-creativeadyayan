@@ -36,19 +36,7 @@ import {
   DEFAULT_PRICE,
   DEFAULT_INSTRUCTOR,
 } from "../lib/CoursesMeta";
-
-/**
- * MyCourses — Creative Adhyayan (live Firestore version, mobile-first)
- *
- * Reads two catalog collections — `courses` (long-form) and
- * `shortCourses` (short-form) — merges them client-side, and layers on
- * each student's own `users/{uid}/enrollments/{courseId}` doc for
- * saved/purchased/progress state. Docs with `status: "draft"` are
- * hidden; every other doc (including ones added by hand in the Firebase
- * console with no `status` field at all) is shown. Missing optional
- * fields (title, instructor, icon, price, lessons, color) fall back to
- * sane defaults so an incomplete catalog doc never breaks the page.
- */
+import { CourseCardSkeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
 const DARK = "#1B0E3D";
@@ -74,7 +62,6 @@ function TypeBadge({ type }) {
   );
 }
 
-/** Real photo thumbnail when `course.image` is set, else an icon-on-gradient tile. */
 function CourseThumb({ course, children }) {
   const Icon = ICONS[course.icon] || BookOpen;
   const [imgFailed, setImgFailed] = useState(false);
@@ -135,7 +122,6 @@ const CourseCard = forwardRef(function CourseCard({ course, onOpen, onToggleSave
       transition={{ duration: 0.18 }}
       className="flex flex-col overflow-hidden rounded-2xl bg-white shadow-sm ring-1 ring-black/[0.03]"
     >
-      {/* thumbnail */}
       <CourseThumb course={course}>
         {isDone && (
           <span className="absolute right-2.5 top-2.5 flex items-center gap-1 rounded-full bg-white/90 px-2 py-1 text-[10px] font-bold text-emerald-600 sm:right-3 sm:top-3 sm:px-2.5 sm:text-[11px]">
@@ -168,7 +154,6 @@ const CourseCard = forwardRef(function CourseCard({ course, onOpen, onToggleSave
         )}
       </CourseThumb>
 
-      {/* body */}
       <div className="flex flex-1 flex-col gap-2.5 p-3.5 sm:gap-3 sm:p-4">
         <div className="min-w-0">
           <div className="mb-1 flex items-center gap-1.5">
@@ -437,10 +422,6 @@ export default function MyCourses() {
     return unsub;
   }, []);
 
-  // Fetch the whole collection and filter out explicit drafts client-side
-  // (rather than a server-side `where("status","==","published")` query),
-  // so legacy/hand-added docs with no `status` field still show up. Mirror
-  // "status !== draft" in Firestore rules too.
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "courses"),
@@ -452,8 +433,6 @@ export default function MyCourses() {
         setLongLoaded(true);
       },
       (err) => {
-        // Without this, a permission-denied error would leave longLoaded
-        // stuck false forever with the UI silently spinning.
         console.error("[courses] onSnapshot error:", err.code, err.message);
         setFetchError(err.message);
         setLongLoaded(true);
@@ -506,18 +485,12 @@ export default function MyCourses() {
 
   const loading = !longLoaded || !shortLoaded || !enrollmentsLoaded;
 
-  // Merge both catalogs into one list, tagging each doc with a `type`
-  // fallback based on which collection it came from.
   const rawCourses = useMemo(() => {
     const long = longCourses.map((c) => ({ type: c.type || "long", ...c }));
     const short = shortCourses.map((c) => ({ type: c.type || "short", ...c }));
     return [...long, ...short];
   }, [longCourses, shortCourses]);
 
-  // Fill in every field the UI relies on so an incomplete catalog doc
-  // (e.g. one added by hand in the Firebase console with only
-  // category/description/duration set, no title/instructor/etc.) still
-  // renders instead of crashing the filter or showing blank text.
   const courses = useMemo(() => {
     return rawCourses.map((c) => {
       const e = enrollments[c.id] || {};
@@ -541,9 +514,6 @@ export default function MyCourses() {
     });
   }, [rawCourses, enrollments]);
 
-  // "Long"/"Short" filter by course.type; "Saved" filters by the saved
-  // flag; everything else (In progress/Completed) filters by enrollment
-  // status, same as before.
   const filtered = useMemo(() => {
     return courses.filter((c) => {
       let matchesFilter = true;
@@ -597,10 +567,6 @@ export default function MyCourses() {
     if (!uid) return;
     setPurchaseStatus("processing");
 
-    // TODO: replace with your real payment/checkout call (Razorpay, etc).
-    // TODO: once Razorpay is wired, this write should move server-side —
-    // a Cloud Function verifying the payment signature before flipping
-    // `purchased` to true. See firestore.rules for the matching note.
     await new Promise((res) => setTimeout(res, 1200));
 
     await setDoc(
@@ -666,7 +632,6 @@ export default function MyCourses() {
           </label>
         </div>
 
-        {/* filter pills — full-bleed horizontal scroll on mobile, no visible scrollbar */}
         <div className="-mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           <div className="flex gap-2 pb-1">
             {FILTERS.map((f) => {
@@ -696,8 +661,8 @@ export default function MyCourses() {
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-20 sm:py-24">
-            <Loader2 className="h-6 w-6 animate-spin" style={{ color: ACCENT }} />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">
+            {Array.from({ length: 6 }).map((_, i) => <CourseCardSkeleton key={i} />)}
           </div>
         ) : (
           <motion.div layout className="grid grid-cols-1 gap-4 sm:grid-cols-2 sm:gap-5 xl:grid-cols-3">

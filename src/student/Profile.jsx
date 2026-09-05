@@ -4,8 +4,9 @@ import { motion } from "framer-motion";
 import { onAuthStateChanged, updateProfile, sendPasswordResetEmail, signOut } from "firebase/auth";
 import { doc, onSnapshot, setDoc, collection, query, where, onSnapshot as onSnap } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { auth, db, storage } from "../firebase/Firebase"; // storage must be exported from firebase.js — see setup notes below
+import { auth, db, storage } from "../firebase/Firebase";
 import { Camera, Pencil, Check, X, Award, BookOpen, Calendar, KeyRound, LogOut, Loader2 } from "lucide-react";
+import { Skeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
@@ -29,7 +30,7 @@ export default function Profile() {
   const fileInputRef = useRef(null);
 
   const [uid, setUid] = useState(null);
-  const [authUser, setAuthUser] = useState(null); // { displayName, email, photoURL, metadata }
+  const [authUser, setAuthUser] = useState(null);
 
   const [profileDoc, setProfileDoc] = useState({ phone: "", bio: "" });
   const [loading, setLoading] = useState(true);
@@ -42,10 +43,9 @@ export default function Profile() {
   const [courseCount, setCourseCount] = useState(0);
   const [certCount, setCertCount] = useState(0);
 
-  const [message, setMessage] = useState(""); // success/info banner
+  const [message, setMessage] = useState("");
   const [error, setError] = useState("");
 
-  /* auth + profile doc */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setUid(user?.uid ?? null);
@@ -70,7 +70,6 @@ export default function Profile() {
     return unsub;
   }, [uid]);
 
-  /* live stats */
   useEffect(() => {
     if (!uid) return;
     const unsubEnroll = onSnap(query(collection(db, "enrollments"), where("uid", "==", uid)), (snap) =>
@@ -178,8 +177,26 @@ export default function Profile() {
 
   if (loading) {
     return (
-      <div className="mx-auto max-w-3xl py-16 text-center">
-        <p className="text-xs text-[#A79BC4]">Loading profile…</p>
+      <div className="mx-auto max-w-3xl">
+        <div className={`relative overflow-hidden rounded-3xl bg-white p-7 ${cardShadow}`}>
+          <div className="flex flex-col items-center gap-4 sm:flex-row sm:items-start">
+            <Skeleton className="h-20 w-20 rounded-full shrink-0" />
+            <div className="min-w-0 flex-1 space-y-2 text-center sm:text-left">
+              <Skeleton className="h-4 w-40 mx-auto sm:mx-0" />
+              <Skeleton className="h-3 w-56 mx-auto sm:mx-0" />
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-3 gap-4">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className={`rounded-2xl bg-white p-4 text-center space-y-2 ${cardShadow}`}>
+              <Skeleton className="h-4 w-4 mx-auto rounded-full" />
+              <Skeleton className="h-4 w-8 mx-auto" />
+              <Skeleton className="h-2 w-12 mx-auto" />
+            </div>
+          ))}
+        </div>
       </div>
     );
   }
@@ -197,7 +214,6 @@ export default function Profile() {
         </motion.div>
       )}
 
-      {/* header card */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={0} className={`relative overflow-hidden rounded-3xl bg-white p-7 ${cardShadow}`}>
         <div
           aria-hidden="true"
@@ -300,7 +316,6 @@ export default function Profile() {
         )}
       </motion.div>
 
-      {/* stats */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={1} className="mt-4 grid grid-cols-3 gap-4">
         <div className={`rounded-2xl bg-white p-4 text-center ${cardShadow}`}>
           <BookOpen className="mx-auto h-4 w-4" style={{ color: ACCENT }} />
@@ -319,7 +334,6 @@ export default function Profile() {
         </div>
       </motion.div>
 
-      {/* account actions */}
       <motion.div variants={fadeUp} initial="hidden" animate="show" custom={2} className={`mt-4 rounded-3xl bg-white p-5 ${cardShadow}`}>
         <h3 className="mb-3 text-sm font-bold text-[#1B0E3D]">Account</h3>
 

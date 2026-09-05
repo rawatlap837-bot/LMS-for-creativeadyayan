@@ -6,6 +6,7 @@ import {
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/Firebase.js";
 import { AT, StatCard, Card } from "./AdminUI.jsx";
+import { StatCardSkeleton } from "./Skeleton"; // adjust path to match where Skeleton.jsx actually lives
 
 /* ------------------------------------------------------------------
  * Firestore collection names — change these to match your DB.
@@ -57,8 +58,15 @@ export default function AdminDashboard() {
   const [courses, setCourses] = useState([]);
   const [payments, setPayments] = useState([]);
   const [instructorsCount, setInstructorsCount] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loaded, setLoaded] = useState({
+    students: false,
+    courses: false,
+    payments: false,
+    instructors: false,
+  });
   const [error, setError] = useState(null);
+
+  const loading = !(loaded.students && loaded.courses && loaded.payments && loaded.instructors);
 
   useEffect(() => {
     const unsubs = [];
@@ -67,7 +75,10 @@ export default function AdminDashboard() {
       unsubs.push(
         onSnapshot(
           collection(db, COLLECTIONS.students),
-          (snap) => setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+          (snap) => {
+            setStudents(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setLoaded((prev) => ({ ...prev, students: true }));
+          },
           (err) => setError(err.message)
         )
       );
@@ -75,7 +86,10 @@ export default function AdminDashboard() {
       unsubs.push(
         onSnapshot(
           collection(db, COLLECTIONS.courses),
-          (snap) => setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+          (snap) => {
+            setCourses(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setLoaded((prev) => ({ ...prev, courses: true }));
+          },
           (err) => setError(err.message)
         )
       );
@@ -83,7 +97,10 @@ export default function AdminDashboard() {
       unsubs.push(
         onSnapshot(
           collection(db, COLLECTIONS.payments),
-          (snap) => setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() }))),
+          (snap) => {
+            setPayments(snap.docs.map((d) => ({ id: d.id, ...d.data() })));
+            setLoaded((prev) => ({ ...prev, payments: true }));
+          },
           (err) => setError(err.message)
         )
       );
@@ -92,16 +109,19 @@ export default function AdminDashboard() {
         unsubs.push(
           onSnapshot(
             collection(db, COLLECTIONS.instructors),
-            (snap) => setInstructorsCount(snap.size),
+            (snap) => {
+              setInstructorsCount(snap.size);
+              setLoaded((prev) => ({ ...prev, instructors: true }));
+            },
             (err) => setError(err.message)
           )
         );
+      } else {
+        setLoaded((prev) => ({ ...prev, instructors: true }));
       }
-
-      setLoading(false);
     } catch (err) {
       setError(err.message);
-      setLoading(false);
+      setLoaded({ students: true, courses: true, payments: true, instructors: true });
     }
 
     return () => unsubs.forEach((unsub) => unsub());
@@ -182,10 +202,16 @@ export default function AdminDashboard() {
       )}
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard label="Total Students" value={loading ? "…" : totalStudents.toLocaleString()} icon={Users} />
-        <StatCard label="Active Instructors" value={loading ? "…" : instructorsCount ?? "—"} icon={GraduationCap} />
-        <StatCard label="Published Courses" value={loading ? "…" : publishedCourses} icon={BookOpen} />
-        <StatCard label="Revenue (₹L)" value={loading ? "…" : (totalRevenue / 100000).toFixed(1)} icon={Wallet} />
+        {loading ? (
+          Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)
+        ) : (
+          <>
+            <StatCard label="Total Students" value={totalStudents.toLocaleString()} icon={Users} />
+            <StatCard label="Active Instructors" value={instructorsCount ?? "—"} icon={GraduationCap} />
+            <StatCard label="Published Courses" value={publishedCourses} icon={BookOpen} />
+            <StatCard label="Revenue (₹L)" value={(totalRevenue / 100000).toFixed(1)} icon={Wallet} />
+          </>
+        )}
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

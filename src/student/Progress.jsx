@@ -23,27 +23,7 @@ import { auth, db } from "../firebase/Firebase";
 import { onAuthStateChanged } from "firebase/auth";
 import { collection, onSnapshot } from "firebase/firestore";
 import { iconForCategory, estimateLessons } from "../lib/CoursesMeta";
-
-/**
- * Progress — Creative Adhyayan (live Firestore version)
- *
- * Reuses the exact same data model as MyCourses.jsx, including the
- * dual-collection catalog: `courses` (long-form) and `shortCourses`
- * (short-form) are both fetched and merged, and the same field-fallback
- * pass (title/category/lessons/icon/color) is applied here too — so a
- * catalog doc missing optional fields never shows "undefined" or 0
- * lessons the way it used to.
- *
- * courses / shortCourses (collections)
- *   {courseId}: { title, instructor, category, icon, color, lessons, duration, price }
- *
- * users/{uid}/enrollments (subcollection)
- *   {courseId}: { saved, purchased, lessonsDone, progress, status, updatedAt }
- *
- * This screen doesn't write anything — it's a read-only dashboard that
- * aggregates the same enrollment docs MyCourses.jsx already maintains,
- * so progress updates made there show up here instantly (onSnapshot).
- */
+import { RingSkeleton, StatCardSkeleton, Skeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
@@ -223,7 +203,7 @@ function CategoryBreakdown({ categories }) {
 }
 
 export default function Progress() {
-  const [uid, setUid] = useState(undefined); // undefined = checking, null = logged out
+  const [uid, setUid] = useState(undefined);
   const [longCourses, setLongCourses] = useState([]);
   const [shortCourses, setShortCourses] = useState([]);
   const [longLoaded, setLongLoaded] = useState(false);
@@ -236,7 +216,6 @@ export default function Progress() {
     return unsub;
   }, []);
 
-  // Same dual-collection fetch as MyCourses.jsx — long-form courses.
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "courses"),
@@ -252,7 +231,6 @@ export default function Progress() {
     return unsub;
   }, []);
 
-  // Same dual-collection fetch as MyCourses.jsx — short-form courses.
   useEffect(() => {
     const unsub = onSnapshot(
       collection(db, "shortCourses"),
@@ -292,15 +270,10 @@ export default function Progress() {
 
   const loading = !longLoaded || !shortLoaded || !enrollmentsLoaded;
 
-  // Merge both catalogs into one list, same as MyCourses.jsx.
   const rawCourses = useMemo(() => {
     return [...longCourses, ...shortCourses];
   }, [longCourses, shortCourses]);
 
-  // Same field-fallback pass as MyCourses.jsx: an incomplete catalog doc
-  // (missing title/category/lessons/icon/color) still renders sane
-  // values instead of "undefined" categories or 0-lesson totals.
-  // Only courses the user actually owns count toward progress.
   const purchasedCourses = useMemo(() => {
     return rawCourses
       .map((c) => {
@@ -357,7 +330,6 @@ export default function Progress() {
   }, [purchasedCourses]);
 
   const sortedCourses = useMemo(() => {
-    // In-progress courses first (most useful to see), then not-started, then completed.
     const rank = { "In progress": 0, "Not started": 1, Completed: 2 };
     return [...purchasedCourses].sort((a, b) => (rank[a.status] ?? 1) - (rank[b.status] ?? 1));
   }, [purchasedCourses]);
@@ -383,8 +355,38 @@ export default function Progress() {
 
   if (loading) {
     return (
-      <div className="flex min-h-screen items-center justify-center" style={{ background: CANVAS }}>
-        <Loader2 className="h-6 w-6 animate-spin" style={{ color: ACCENT }} />
+      <div className="min-h-screen overflow-x-hidden p-4 sm:p-6" style={{ background: CANVAS }}>
+        <div className="mx-auto flex max-w-6xl flex-col gap-5 sm:gap-6">
+          <div className="space-y-2">
+            <Skeleton className="h-5 w-40" />
+            <Skeleton className="h-3 w-72" />
+          </div>
+
+          <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-[minmax(0,280px)_1fr]">
+            <div className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/[0.03]">
+              <RingSkeleton size={116} />
+              <div className="flex-1 space-y-2">
+                <Skeleton className="h-3 w-24" />
+                <Skeleton className="h-3 w-32" />
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
+              {Array.from({ length: 4 }).map((_, i) => <StatCardSkeleton key={i} />)}
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3 rounded-xl bg-white p-4 shadow-sm ring-1 ring-black/[0.03]">
+                <Skeleton className="h-10 w-10 rounded-lg" />
+                <div className="flex-1 space-y-2">
+                  <Skeleton className="h-3 w-1/3" />
+                  <Skeleton className="h-2 w-full" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     );
   }
@@ -413,7 +415,6 @@ export default function Progress() {
           </div>
         ) : (
           <>
-            {/* top: ring + stat cards — stacked on mobile, side-by-side from md up */}
             <div className="grid grid-cols-1 gap-4 sm:gap-5 md:grid-cols-[minmax(0,280px)_1fr]">
               <div className="flex items-center gap-5 rounded-2xl bg-white p-5 shadow-sm ring-1 ring-black/[0.03]">
                 <OverallRing percent={stats.overallPercent} />
@@ -436,10 +437,8 @@ export default function Progress() {
               </div>
             </div>
 
-            {/* middle: category breakdown */}
             <CategoryBreakdown categories={categoryBreakdown} />
 
-            {/* bottom: per-course list */}
             <div>
               <h3 className="mb-3 flex items-center gap-2 text-sm font-bold" style={{ color: DARK }}>
                 <TrendingUp className="h-4 w-4" style={{ color: ACCENT }} />

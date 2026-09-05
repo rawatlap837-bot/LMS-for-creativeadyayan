@@ -32,31 +32,7 @@ import {
   RotateCcw,
   MapPin,
 } from "lucide-react";
-
-/**
- * Dashboard — Creative Adhyayan student home
- *
- * Data is live from Firestore instead of hardcoded arrays. Expected
- * collections (create these in Firestore, or point the queries below at
- * your existing ones):
- *
- *   notifications   { uid, title, body, createdAt: Timestamp, read: bool }
- *   scheduleEvents  { uid, date: Timestamp, time: string, label: string }
- *   tasks           { uid, title, duration: string, progress: number (0-100),
- *                      date: Timestamp }   // date = the day the task belongs to
- *   enrollments     { uid, courseName: string, progress: number (0-100),
- *                      color: string }     // color is optional, falls back below
- *   liveClasses     { uid, title, startTime: Timestamp, endTime: Timestamp,
- *                      location: string, status: "upcoming"|"joined"|"rescheduled" }
- *
- * `db` must be exported from ../data/Firebase, e.g.:
- *   import { getFirestore } from "firebase/firestore";
- *   export const db = getFirestore(app);
- *
- * NOTE: the Assignments section (and its Firestore listener) has been
- * removed from this dashboard. Assignments still live at
- * /dashboard/assignments if you have that route elsewhere.
- */
+import { ListRowSkeleton, RingSkeleton, Skeleton } from "../components/Skeleton"; // adjust path
 
 const ACCENT = "#5227FF";
 const AMBER = "#E8A33D";
@@ -75,8 +51,6 @@ const fadeUp = {
 };
 
 const WEEK_DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-
-/* ------------------------------------------------------------------ */
 
 function CircularProgress({ value, size = 76, stroke = 7, color = ACCENT }) {
   const radius = (size - stroke) / 2;
@@ -112,20 +86,15 @@ function CircularProgress({ value, size = 76, stroke = 7, color = ACCENT }) {
   );
 }
 
-/* ------------------------------------------------------------------ */
-
 const QUICK_ACTIONS = [
   { label: "Continue courses", caption: "Pick up your last lesson", icon: BookOpen, to: "/dashboard/my-courses" },
   { label: "Study planner", caption: "Plan this week's sessions", icon: CalendarClock, to: "/dashboard/progress" },
   { label: "Live sessions", caption: "Join your next live class", icon: Video, to: "/dashboard/my-courses" },
 ];
 
-/* ---------- date helpers ---------- */
-
-// Monday-start week that contains `d`, shifted by `offset` weeks.
 function getWeekRange(offset = 0) {
   const now = new Date();
-  const day = now.getDay(); // 0 = Sun
+  const day = now.getDay();
   const mondayOffset = day === 0 ? -6 : 1 - day;
   const monday = new Date(now);
   monday.setHours(0, 0, 0, 0);
@@ -165,8 +134,6 @@ function timeAgo(date) {
   return `${days} days ago`;
 }
 
-/* ------------------------------------------------------------------ */
-
 export default function Dashboard() {
   const navigate = useNavigate();
   const [uid, setUid] = useState(null);
@@ -193,7 +160,6 @@ export default function Dashboard() {
   });
   const [weekOffset, setWeekOffset] = useState(0);
 
-  /* ---- auth ---- */
   useEffect(() => {
     const unsub = onAuthStateChanged(auth, (user) => {
       setUid(user?.uid ?? null);
@@ -203,7 +169,6 @@ export default function Dashboard() {
     return unsub;
   }, []);
 
-  /* ---- notifications (latest 10, unread first isn't required, just newest) ---- */
   useEffect(() => {
     if (!uid) return;
     setNotifLoading(true);
@@ -230,7 +195,6 @@ export default function Dashboard() {
     return unsub;
   }, [uid]);
 
-  /* ---- today's tasks ---- */
   useEffect(() => {
     if (!uid) return;
     setTasksLoading(true);
@@ -263,7 +227,6 @@ export default function Dashboard() {
     return unsub;
   }, [uid]);
 
-  /* ---- this week's schedule (re-queries when weekOffset changes) ---- */
   useEffect(() => {
     if (!uid) return;
     setScheduleLoading(true);
@@ -306,7 +269,6 @@ export default function Dashboard() {
     return map;
   }, [scheduleEvents]);
 
-  /* ---- course progress ---- */
   useEffect(() => {
     if (!uid) return;
     setCoursesLoading(true);
@@ -332,7 +294,6 @@ export default function Dashboard() {
     return unsub;
   }, [uid]);
 
-  /* ---- next live class ---- */
   useEffect(() => {
     if (!uid) return;
     setLiveClassLoading(true);
@@ -370,9 +331,8 @@ export default function Dashboard() {
     return unsub;
   }, [uid]);
 
-  /* ---- actions (write to Firestore) ---- */
   const dismissNotification = async (id) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id)); // optimistic
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
     try {
       await deleteDoc(doc(db, "notifications", id));
     } catch (err) {
@@ -422,7 +382,7 @@ export default function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl">
-      {/* ================= ROW 1 — greeting + quick actions ================= */}
+      {/* ROW 1 — greeting + quick actions */}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-12">
         <motion.div
           variants={fadeUp}
@@ -441,11 +401,15 @@ export default function Dashboard() {
             <br />
             What's the plan for today?
           </h2>
-          <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#6b5f87]">
-            {tasksLoading
-              ? "Loading today's plan…"
-              : `You've completed ${tasksDone} of ${tasks.length} tasks today. Keep the streak going — your next lesson is waiting.`}
-          </p>
+
+          {tasksLoading ? (
+            <Skeleton className="mt-3 h-3 w-64" />
+          ) : (
+            <p className="mt-3 max-w-sm text-sm leading-relaxed text-[#6b5f87]">
+              {`You've completed ${tasksDone} of ${tasks.length} tasks today. Keep the streak going — your next lesson is waiting.`}
+            </p>
+          )}
+
           <Link
             to="/dashboard/my-courses"
             className="group/cta mt-5 inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-bold text-white transition-transform active:scale-[0.98]"
@@ -518,9 +482,8 @@ export default function Dashboard() {
         </div>
       </div>
 
-      {/* ================= ROW 2 — notifications / schedule ================= */}
+      {/* ROW 2 — notifications / schedule */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* notifications */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={4} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
@@ -535,7 +498,9 @@ export default function Dashboard() {
           </div>
 
           {notifLoading ? (
-            <p className="py-6 text-center text-xs text-[#A79BC4]">Loading…</p>
+            <div className="space-y-1">
+              {Array.from({ length: 3 }).map((_, i) => <ListRowSkeleton key={i} />)}
+            </div>
           ) : notifications.length === 0 ? (
             <p className="py-6 text-center text-xs text-[#A79BC4]">You're all caught up.</p>
           ) : (
@@ -561,7 +526,6 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* schedule */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={5} className={`rounded-3xl bg-white p-5 ${cardShadow}`}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#1B0E3D]">This week</h3>
@@ -617,7 +581,9 @@ export default function Dashboard() {
 
           <div className="mt-3 space-y-2">
             {scheduleLoading ? (
-              <p className="py-4 text-center text-xs text-[#A79BC4]">Loading…</p>
+              <div className="space-y-2">
+                {Array.from({ length: 3 }).map((_, i) => <ListRowSkeleton key={i} />)}
+              </div>
             ) : (agendaByDay[activeDay] || []).length === 0 ? (
               <p className="py-4 text-center text-xs text-[#A79BC4]">Nothing scheduled.</p>
             ) : (
@@ -637,9 +603,8 @@ export default function Dashboard() {
         </motion.div>
       </div>
 
-      {/* ================= ROW 3 — tasks / upgrade / progress / live class ================= */}
+      {/* ROW 3 — tasks / upgrade / progress / live class */}
       <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-12">
-        {/* today's tasks */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={7} className={`rounded-3xl bg-white p-5 lg:col-span-5 ${cardShadow}`}>
           <div className="mb-3 flex items-center justify-between">
             <h3 className="text-sm font-bold text-[#1B0E3D]">Today's tasks</h3>
@@ -649,7 +614,9 @@ export default function Dashboard() {
           </div>
 
           {tasksLoading ? (
-            <p className="py-6 text-center text-xs text-[#A79BC4]">Loading…</p>
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => <ListRowSkeleton key={i} />)}
+            </div>
           ) : tasks.length === 0 ? (
             <p className="py-6 text-center text-xs text-[#A79BC4]">No tasks for today.</p>
           ) : (
@@ -687,7 +654,6 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* upgrade banner */}
         <motion.div
           variants={fadeUp}
           initial="hidden"
@@ -716,10 +682,14 @@ export default function Dashboard() {
           </button>
         </motion.div>
 
-        {/* progress rings */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={9} className={`flex flex-col justify-center gap-4 rounded-3xl bg-white p-5 lg:col-span-2 ${cardShadow}`}>
           {coursesLoading ? (
-            <p className="text-center text-xs text-[#A79BC4]">Loading…</p>
+            Array.from({ length: 3 }).map((_, i) => (
+              <div key={i} className="flex items-center gap-3">
+                <RingSkeleton size={56} />
+                <Skeleton className="h-3 w-16" />
+              </div>
+            ))
           ) : courses.length === 0 ? (
             <p className="text-center text-xs text-[#A79BC4]">No courses yet.</p>
           ) : (
@@ -732,7 +702,6 @@ export default function Dashboard() {
           )}
         </motion.div>
 
-        {/* live class card */}
         <motion.div variants={fadeUp} initial="hidden" animate="show" custom={10} className={`rounded-3xl bg-white p-5 lg:col-span-2 ${cardShadow}`}>
           <h3 className="flex items-center gap-2 text-sm font-bold text-[#1B0E3D]">
             <Video className="h-4 w-4 text-[#6D3FC0]" />
@@ -740,7 +709,11 @@ export default function Dashboard() {
           </h3>
 
           {liveClassLoading ? (
-            <p className="mt-3 text-center text-xs text-[#A79BC4]">Loading…</p>
+            <div className="mt-3 space-y-2">
+              <Skeleton className="h-3 w-2/3" />
+              <Skeleton className="h-3 w-1/2" />
+              <Skeleton className="mt-3 h-8 w-full rounded-full" />
+            </div>
           ) : !liveClass ? (
             <p className="mt-3 text-center text-xs text-[#A79BC4]">No upcoming live class.</p>
           ) : (
