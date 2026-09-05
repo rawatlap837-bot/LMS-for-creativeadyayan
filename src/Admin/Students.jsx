@@ -7,7 +7,7 @@ import { db } from "../firebase/Firebase";
 import {
   AT, Pill, Card, Modal, Field, PrimaryButton, GhostButton, EmptyState, ConfirmDeleteModal,
 } from "./AdminUI";
-import { TableRowSkeleton } from "./Skeleton"; // adjust path if needed
+import { TableRowSkeleton } from "../components/Skeleton";n
 
 // Firestore collection names — change if yours differ
 const STUDENTS_COLLECTION = "students";

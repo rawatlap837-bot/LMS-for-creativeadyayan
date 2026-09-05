@@ -6,7 +6,7 @@ import {
 import { collection, onSnapshot } from "firebase/firestore";
 import { db } from "../firebase/Firebase.js";
 import { AT, StatCard, Card } from "./AdminUI.jsx";
-import { StatCardSkeleton } from "./Skeleton"; // adjust path to match where Skeleton.jsx actually lives
+import { TableRowSkeleton } from "../components/Skeleton";
 
 /* ------------------------------------------------------------------
  * Firestore collection names — change these to match your DB.
