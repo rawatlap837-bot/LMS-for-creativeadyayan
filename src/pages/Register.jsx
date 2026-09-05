@@ -8,8 +8,6 @@ import {
   updateProfile,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   browserLocalPersistence,
   setPersistence,
 } from "firebase/auth";
@@ -49,14 +47,14 @@ function DotGrid({ className = "", dot = "fill-white/25" }) {
 
 const CUBE_GRID_SIZE = 8;
 
-// Same detection logic as LoginForm — keep these in sync.
-function shouldUseRedirect() {
+// Same detection logic as Login — keep these in sync. signInWithPopup
+// works fine in real mobile browsers now; the only genuine failure case
+// is an in-app webview (Instagram/FB/WhatsApp), which Google blocks
+// regardless of client code.
+function isInAppBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  const isMobileUA = /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
-  const isInAppBrowser = /FBAN|FBAV|Instagram|Line\//i.test(ua);
-  const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
-  return isMobileUA || isInAppBrowser || isNarrowViewport;
+  return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(ua);
 }
 
 function firebaseAuthErrorMessage(error) {
@@ -112,43 +110,6 @@ export default function RegisterForm() {
     document.body.scrollTop = 0;
   }, []);
 
-  // Pick up the result after returning from Google's redirect flow.
-  // getRedirectResult() can only be consumed ONCE per redirect app-wide —
-  // this component and LoginForm are the only two callers; don't add a
-  // third (e.g. in App.jsx) or one of them will always see null.
-  useEffect(() => {
-    let cancelled = false;
-
-    if (shouldUseRedirect()) {
-      setGoogleLoading(true);
-    }
-
-    (async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (cancelled) return;
-        if (result?.user) {
-          navigate("/dashboard");
-          return;
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const message = firebaseAuthErrorMessage(err);
-          if (message) {
-            setStatus("error");
-            setErrorMsg(message);
-          }
-        }
-      } finally {
-        if (!cancelled) setGoogleLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
 
   const strength = passwordStrength(form.password);
 
@@ -206,18 +167,20 @@ export default function RegisterForm() {
 
   const handleGoogleSignIn = async () => {
     setErrorMsg("");
-    setGoogleLoading(true);
 
+    if (isInAppBrowser()) {
+      setStatus("error");
+      setErrorMsg(
+        "Google sign-in doesn't work inside this app's built-in browser. Please open this page in Chrome or Safari instead."
+      );
+      return;
+    }
+
+    setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
 
     try {
       await setPersistence(auth, browserLocalPersistence);
-
-      if (shouldUseRedirect()) {
-        await signInWithRedirect(auth, provider);
-        return;
-      }
-
       await signInWithPopup(auth, provider);
       navigate("/dashboard");
     } catch (err) {

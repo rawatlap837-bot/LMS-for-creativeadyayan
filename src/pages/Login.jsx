@@ -8,8 +8,6 @@ import {
   signInWithEmailAndPassword,
   GoogleAuthProvider,
   signInWithPopup,
-  signInWithRedirect,
-  getRedirectResult,
   browserLocalPersistence,
   browserSessionPersistence,
   setPersistence,
@@ -34,24 +32,19 @@ import {
  *
  * MOBILE GOOGLE SIGN-IN
  * ───────────────────────
- * On mobile / in-app browsers / narrow viewports we use signInWithRedirect
- * instead of signInWithPopup (popups are blocked/unreliable on mobile).
- * We always force browserLocalPersistence for the redirect path — it must
- * survive the cross-origin round trip through accounts.google.com and the
- * authDomain's /__/auth/handler.
+ * Uses signInWithPopup for everyone — desktop and mobile. Modern mobile
+ * Chrome/Safari support popups fine in a real browser tab; the redirect
+ * dance (signInWithRedirect + custom authDomain + proxy rewrites) is
+ * fragile and unnecessary. The one real mobile failure case is an
+ * in-app browser (Instagram/Facebook/WhatsApp's built-in webview) —
+ * Google blocks OAuth there on purpose, and no client code can fix that,
+ * so we just detect it and tell the person to open a real browser.
  *
- * IMPORTANT — this flow only works if:
- *   1. Your host serves index.html for every route (SPA fallback). On
- *      Vercel that means a vercel.json with a catch-all rewrite. Without
- *      it, the hard page-reload that Google sends the browser back to
- *      after redirect sign-in will 404, and this code never even runs.
- *   2. Your Vercel domain is in Firebase Console → Authentication →
- *      Settings → Authorized domains.
- *   3. Your Vercel domain is in Google Cloud Console → Credentials →
- *      OAuth Client → Authorized JavaScript origins, and the Firebase
- *      authDomain's /__/auth/handler is in Authorized redirect URIs.
- *   4. You're not testing inside an in-app browser (Instagram/FB/etc) —
- *      Google blocks OAuth there regardless of code.
+ * This only needs:
+ *   1. Your production domain listed in Firebase Console → Authentication
+ *      → Settings → Authorized domains.
+ *   2. VITE_FIREBASE_AUTH_DOMAIN left at the default <project>.firebaseapp.com
+ *      — no custom domain, no proxy rewrites needed.
  */
 
 function DotGrid({ className = "", dot = "fill-white/25" }) {
@@ -68,13 +61,16 @@ function DotGrid({ className = "", dot = "fill-white/25" }) {
 
 const CUBE_GRID_SIZE = 8;
 
-function shouldUseRedirect() {
+// The only real mobile failure case for Google sign-in is an in-app
+// browser (Instagram/Facebook/WhatsApp's built-in webview) — Google
+// actively blocks OAuth there for security reasons, and no client code
+// can work around it. Everywhere else — real mobile Chrome, Safari,
+// Samsung Internet, desktop — signInWithPopup works fine, so we no
+// longer need a separate redirect code path at all.
+function isInAppBrowser() {
   if (typeof navigator === "undefined") return false;
   const ua = navigator.userAgent || "";
-  const isMobileUA = /Android|iPhone|iPad|iPod|Mobi/i.test(ua);
-  const isInAppBrowser = /FBAN|FBAV|Instagram|Line\//i.test(ua);
-  const isNarrowViewport = typeof window !== "undefined" && window.innerWidth < 768;
-  return isMobileUA || isInAppBrowser || isNarrowViewport;
+  return /FBAN|FBAV|Instagram|Line\/|MicroMessenger|Snapchat/i.test(ua);
 }
 
 function firebaseAuthErrorMessage(error) {
@@ -136,50 +132,6 @@ export default function LoginForm() {
     document.body.scrollTop = 0;
   }, []);
 
-  // Pick up the result after returning from Google's redirect flow (mobile
-  // path). On desktop this simply resolves to null and does nothing.
-  // getRedirectResult() can only be consumed ONCE per redirect — don't
-  // call it more than once across the app (e.g. also in App.jsx), or the
-  // second caller will always get null.
-  useEffect(() => {
-    let cancelled = false;
-
-    // Surface a visible "signing you in…" state immediately if we suspect
-    // we just came back from a redirect, so the screen isn't blank/stuck
-    // while getRedirectResult resolves.
-    if (shouldUseRedirect()) {
-      setGoogleLoading(true);
-    }
-
-    (async () => {
-      try {
-        const result = await getRedirectResult(auth);
-        if (cancelled) return;
-
-        if (result?.user) {
-          const dest = await resolvePostLoginRoute(result.user);
-          navigate(dest);
-          return;
-        }
-      } catch (err) {
-        if (!cancelled) {
-          const message = firebaseAuthErrorMessage(err);
-          if (message) {
-            setStatus("error");
-            setErrorMsg(message);
-          }
-        }
-      } finally {
-        if (!cancelled) setGoogleLoading(false);
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const pulseCubesFor = (fieldName, value) => {
     const col = Math.min(CUBE_GRID_SIZE - 1, value.length % (CUBE_GRID_SIZE + 3));
     const row = fieldName === "email" ? 1.5 : 4.5;
@@ -223,21 +175,22 @@ export default function LoginForm() {
   const handleGoogleSignIn = async () => {
     scrollToTop();
     setErrorMsg("");
-    setGoogleLoading(true);
 
+    if (isInAppBrowser()) {
+      // Google blocks OAuth inside in-app webviews (Instagram/FB/WhatsApp
+      // etc) regardless of anything we do here — the only real fix is to
+      // tell the person to open the site in their actual browser.
+      setStatus("error");
+      setErrorMsg(
+        "Google sign-in doesn't work inside this app's built-in browser. Please open this page in Chrome or Safari instead."
+      );
+      return;
+    }
+
+    setGoogleLoading(true);
     const provider = new GoogleAuthProvider();
-    const useRedirect = shouldUseRedirect();
 
     try {
-      if (useRedirect) {
-        // Always local persistence for the redirect path — it must
-        // survive the cross-origin round trip through accounts.google.com
-        // and the authDomain's /__/auth/handler, regardless of "Remember me".
-        await setPersistence(auth, browserLocalPersistence);
-        await signInWithRedirect(auth, provider);
-        return; // page is navigating away; nothing else runs here
-      }
-
       await setPersistence(auth, remember ? browserLocalPersistence : browserSessionPersistence);
       const { user } = await signInWithPopup(auth, provider);
       const dest = await resolvePostLoginRoute(user);
